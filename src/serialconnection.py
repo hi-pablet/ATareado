@@ -40,7 +40,8 @@ class SerialConnection(object):
                 self.__status = True
                 self.__serial = serial.serial_for_url(
                 port,
-                baudrate)
+                baudrate,
+                do_not_open=True)
 
                 if not hasattr(self.__serial, 'cancel_read'):
                     # enable timeout for alive flag polling if cancel_read is not available
@@ -67,15 +68,19 @@ class SerialConnection(object):
 
     def reader(self):
         try:
-            while self.__status and self._reader_alive:
+            while self.__status:
                 # read all that is there or wait for one byte
+                print >> sys.stdout, "wait"
                 data = self.__serial.read(self.__serial.in_waiting or 1)
+                print >> sys.stdout, "rx"
                 if data:
-                    receivedData(data)
+                    self.receivedData(data)
+                    print >> sys.stdout, data
         except serial.SerialException:
             self.__status = False
 
     def write(self, data):
+        print >> sys.stdout, "tx"
         self.__serial.write(data)
 
 
@@ -90,7 +95,8 @@ if __name__ == '__main__':
 
     conn = SerialConnection()
     conn.receivedData = printerCallback
-    conn.start("/dev/ttyUSB0", 115200)
+    conn.start("/dev/ttyUSB1", 115200)
     time.sleep(1)
-    conn.write("ATI")
+    conn.write("ATI\n\r")
+    time.sleep(5)
 

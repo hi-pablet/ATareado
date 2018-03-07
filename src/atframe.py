@@ -10,3 +10,6 @@ class ATFrame(form.MainFrame):
 
     def conn_button_onclick(self, event):
         self.log_text.AppendText("Connected")
+
+    def writeToLogPannel(self, text):
+        self.log_text.AppendText(text)
