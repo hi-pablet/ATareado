@@ -14,23 +14,8 @@ class ATareado(object):
                     'CSQ': ['AT+CSQ', '', '+CSQ:%number%'],
                     'CGATT': ['AT+CGATT', '', '+CGATT:%number%'],
                     'CIPMUX': ['AT+CIPMUX', '+CIPMUX'],
-                    'CIPMODE': ['AT+CIPMODE','"%val1%,%val2%,%val3%"', 'OK']
-                    }
-''''
-    #  Consultar si el modem esta network attached (to data service)
-    AT + CGATT?
-    +CGATT: 1
-
-    # Enable IP multiple connections
-    AT + CIPMUX = [0, 1]
-    default
-    0
-
-    # Habilitar modo transparente
-    AT + CIPMODE = [0, 1]
-    default
-    0
-
+                    'CIPMODE': ['AT+CIPMODE','"%val1%,%val2%,%val3%"', 'OK'] }
+    '''
     # Start task and set APN
     AT + CSTT = "orangeworld", "orange", "orange"
     OK
@@ -62,14 +47,27 @@ class ATareado(object):
 
     # Config
     AT + CIPCCFG
-'''
+    '''
+
     def __init__(self):
         self.__serialconn =  SerialConnection()
+        self.__mainForm = atframe.ATFrame(None)
+        self.__mainForm.connectCallback = self.connectCallback
+
+    def start(self):
+        serialPorts = serialconnection.getPortsList()
+        self.__mainForm.setAvailablePorts(serialPorts)
+        self.__mainForm.Show()
+
+    def connectCallback(self, port, baudrate):
+
+        status = self.__serialconn.start(port, baudrate)
+        self.__mainForm.setConnectionStatus(status)
 
 if __name__ == "__main__":
     app = wx.App(False)
 
-    frame = atframe.ATFrame(None)
-    frame.Show()
+    atareado = ATareado()
+    atareado.start()
 
     app.MainLoop()
