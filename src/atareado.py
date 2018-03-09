@@ -4,8 +4,9 @@ import wx
 import atframe
 import serialconnection
 from serial.tools.list_ports import comports
+import form
 
-class ATareado(object):
+class ATareado(form.MainFrame):
 
     # Command List [id, command, params, return]
     commandsList = {'AT': ['AT', '', 'OK'],
@@ -49,25 +50,43 @@ class ATareado(object):
     AT + CIPCCFG
     '''
 
-    def __init__(self):
-        self.__serialconn =  SerialConnection()
-        self.__mainForm = atframe.ATFrame(None)
-        self.__mainForm.connectCallback = self.connectCallback
+    def __init__(self, parent):
+        form.MainFrame.__init__(self, parent)
+        self.__serialconn = serialconnection.SerialConnection()
 
     def start(self):
         serialPorts = serialconnection.getPortsList()
-        self.__mainForm.setAvailablePorts(serialPorts)
-        self.__mainForm.Show()
+        self.port_combo.Clear()
+        self.port_combo.AppendItems(serialPorts)
 
-    def connectCallback(self, port, baudrate):
 
-        status = self.__serialconn.start(port, baudrate)
-        self.__mainForm.setConnectionStatus(status)
+    def setConnectionStatus(self, status):
+        if status:
+            self.m_staticText1.SetLabel("Connected")
+        else:
+            self.m_staticText1.SetLabel("Disconnected")
+
+    def conn_button_onclick(self, event):
+        self.log_text.AppendText('Conn %s %s '% (self.port_combo.GetValue(), self.m_comboBox2.GetValue()))
+        status = self.__serialconn.start(self.port_combo.GetValue(), self.m_comboBox2.GetValue())
+        self.setConnectionStatus(status)
+
+    def info_button_onclick(self, event):
+        self.log_text.AppendText("Modem Info:")
+
+    def status_button_onclick(self, event):
+        self.log_text.AppendText("Modem Status:")
+        pass
+
+#    def connectCallback(self, port, baudrate):
+#        status = self.__serialconn.start(port, baudrate)
+#        self.__mainForm.setConnectionStatus(status)
 
 if __name__ == "__main__":
     app = wx.App(False)
 
-    atareado = ATareado()
+    atareado = ATareado(None)
     atareado.start()
+    atareado.Show()
 
     app.MainLoop()

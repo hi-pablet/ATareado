@@ -57,7 +57,7 @@ class MainFrame ( wx.Frame ):
 		self.m_panel1.SetSizer( bSizer4 )
 		self.m_panel1.Layout()
 		bSizer4.Fit( self.m_panel1 )
-		self.m_notebook1.AddPage( self.m_panel1, u"a page", False )
+		self.m_notebook1.AddPage( self.m_panel1, u"General", False )
 		self.m_panel2 = wx.Panel( self.m_notebook1, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
 		bSizer5 = wx.BoxSizer( wx.VERTICAL )
 
@@ -77,7 +77,7 @@ class MainFrame ( wx.Frame ):
 		self.m_panel2.SetSizer( bSizer5 )
 		self.m_panel2.Layout()
 		bSizer5.Fit( self.m_panel2 )
-		self.m_notebook1.AddPage( self.m_panel2, u"a page", True )
+		self.m_notebook1.AddPage( self.m_panel2, u"TCP/UDP", True )
 
 		bSizer6.Add( self.m_notebook1, 1, wx.EXPAND |wx.ALL, 5 )
 
@@ -134,6 +134,8 @@ class MainFrame ( wx.Frame ):
 
 		# Connect Events
 		self.conn_button.Bind( wx.EVT_BUTTON, self.conn_button_onclick )
+		self.m_button5.Bind( wx.EVT_BUTTON, self.info_button_onclick )
+		self.m_button6.Bind( wx.EVT_BUTTON, self.status_button_onclick )
 
 	def __del__( self ):
 		pass
@@ -143,4 +145,8 @@ class MainFrame ( wx.Frame ):
 	def conn_button_onclick( self, event ):
 		event.Skip()
 
+	def info_button_onclick( self, event ):
+		event.Skip()
 
+	def status_button_onclick( self, event ):
+		event.Skip()
