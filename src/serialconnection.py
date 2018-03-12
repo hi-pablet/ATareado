@@ -18,6 +18,23 @@ def getPortsList():
         ports.append(port)
     return ports
 
+# Command List [id, command, params, return]
+commandsList = {'AT': ['AT', '', 'OK'],
+                'ATI': ['ATI', '', '%text% OK'],
+                'CPIN': ['AT+CPIN', '', '+CPIN:%text%'],
+                'CSQ': ['AT+CSQ', '', '+CSQ:%number%'],
+                'CGATT': ['AT+CGATT', '', '+CGATT:%number%'],
+                'CIPMUX': ['AT+CIPMUX', '', '+CIPMUX'],
+                'CIPMODE': ['AT+CIPMODE','"%val1%,%val2%,%val3%"', 'OK'],
+                'CSTT' : ['AT+CSTT','"%val1%,%val2%,%val3%"','OK'],
+                'CIICR': ['AT+CIICR', '', 'OK']},
+                'CIFSR' : ['AT+CIFSR', '', '%text%'],
+                'CIPSTART' : ['AT+CIPSTART', '"%val1","%val2","%val3"'], #"[TCP/UDP]", "<ip_dest>", "<port>"
+                'CIPSEND': ['AT+CIPSEND', '', '>'],
+                'CIPCLOSE': ['AT+CIPCLOSE', '', 'OK'],
+                'CIPCCFG': ['AT+CIPCCFG', '', 'OK'],
+                }
+
 
 class SerialConnection(object):
 
@@ -70,16 +87,16 @@ class SerialConnection(object):
         try:
             while self.__status:
                 # read all that is there or wait for one byte
-                print >> sys.stdout, "wait"
+                #print >> sys.stdout, "wait"
                 data = self.__serial.read(self.__serial.in_waiting or 1)
-                print >> sys.stdout, "rx"
+                #print >> sys.stdout, "rx"
                 if data:
                     self.receivedData(data)
                     print >> sys.stdout, data
         except serial.SerialException:
             self.__status = False
 
-    def write(self, data):
+    def writeRaw(self, data):
         print >> sys.stdout, "tx"
         self.__serial.write(data)
 
