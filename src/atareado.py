@@ -11,8 +11,8 @@ class ATareado(form.MainFrame):
 
     def __init__(self, parent):
         form.MainFrame.__init__(self, parent)
-        self.__serialconn = serialconnection.SerialConnection()
-        self.__serialconn.receivedData = rxDataCallback
+        self.__serialPort = serialconnection.SerialConnection()
+        self.__serialPort.receivedData = rxDataCallback
         self.__cmdSent = None
 
     def start(self):
@@ -29,18 +29,27 @@ class ATareado(form.MainFrame):
 
     def conn_button_onclick(self, event):
         self.log_text.AppendText('Conn %s %s '% (self.port_combo.GetValue(), self.m_comboBox2.GetValue()))
-        status = self.__serialconn.start(self.port_combo.GetValue(), self.m_comboBox2.GetValue())
+        status = self.__serialPort.start(self.port_combo.GetValue(), self.m_comboBox2.GetValue())
         self.setConnectionStatus(status)
 
     def info_button_onclick(self, event):
-        self.log_text.AppendText("Modem Info:")
+        if self.__serialPort.status:
+            self.log_text.AppendText("Modem Info: \n")
+            cmd = serialconnection.ATcommand('ATI', False, None)
+            self.__serialPort.sendCommand(cmd)
+        else:
+            self.log_text.AppendText("Serial connection closed\n")
 
     def status_button_onclick(self, event):
-        self.log_text.AppendText("Modem Status:")
-        pass
+        if self.__serialPort.status:
+            self.log_text.AppendText("Modem Status:")
+        else:
+            self.log_text.AppendText("Serial connection closed\n")
+
 
     def rxDataCallback(self, data):
-
+        self.log_text.AppendText('\n')
+        self.log_text.AppendText(data)
 
 
 if __name__ == "__main__":

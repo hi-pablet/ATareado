@@ -4,6 +4,7 @@ import time
 import threading
 import sys
 import pprint
+import re
 from serial.tools.list_ports import comports
 
 #--------------------------------------
@@ -18,22 +19,33 @@ def getPortsList():
         ports.append(port)
     return ports
 
+
 # Command List [id, command, params, return]
 commandsList = {'AT': ['AT', '', 'OK'],
-                'ATI': ['ATI', '', '%text% OK'],
-                'CPIN': ['AT+CPIN', '', '+CPIN:%text%'],
-                'CSQ': ['AT+CSQ', '', '+CSQ:%number%'],
-                'CGATT': ['AT+CGATT', '', '+CGATT:%number%'],
+                'ATI': ['ATI', '', '(.*) OK'],
+                'CPIN': ['AT+CPIN', '', '+CPIN:(.*)'],
+                'CSQ': ['AT+CSQ', '', '+CSQ:(\d+)'],
+                'CGATT': ['AT+CGATT', '', '+CGATT:(\d+)'],
                 'CIPMUX': ['AT+CIPMUX', '', '+CIPMUX'],
                 'CIPMODE': ['AT+CIPMODE','"%val1%,%val2%,%val3%"', 'OK'],
-                'CSTT' : ['AT+CSTT','"%val1%,%val2%,%val3%"','OK'],
-                'CIICR': ['AT+CIICR', '', 'OK']},
-                'CIFSR' : ['AT+CIFSR', '', '%text%'],
-                'CIPSTART' : ['AT+CIPSTART', '"%val1","%val2","%val3"'], #"[TCP/UDP]", "<ip_dest>", "<port>"
+                'CSTT': ['AT+CSTT','"%val1%,%val2%,%val3%"', 'OK'],
+                'CIICR': ['AT+CIICR', '', 'OK'],
+                'CIFSR': ['AT+CIFSR', '', '(.*)'],
+                'CIPSTART': ['AT+CIPSTART', '"%val1","%val2","%val3"', 'OK'], #"[TCP/UDP]", "<ip_dest>", "<port>"
                 'CIPSEND': ['AT+CIPSEND', '', '>'],
                 'CIPCLOSE': ['AT+CIPCLOSE', '', 'OK'],
-                'CIPCCFG': ['AT+CIPCCFG', '', 'OK'],
-                }
+                'CIPCCFG': ['AT+CIPCCFG', '', 'OK'] }
+
+
+class ATcommand(object):
+
+    def __init__(self, cmdId, setMode, params):
+        self.cmd = cmdId
+        self.setOperation = setMode
+        self.params = params
+        self.paramString = ''
+        self.answer = ''
+        self.respError = False
 
 
 class SerialConnection(object):
@@ -42,19 +54,24 @@ class SerialConnection(object):
     receivedData = None
 
     def __init__(self):
-        self.__status = False
+        self.status = False
         self.__readThread = None
         self.__serial = None
+        self.__currCommand = None
+        self.__waitingAnswer = False
+        # 5 seconds timeout
+        self.__TOTimer = Timer(5, self._timeoutHandler)
+        self.__cmdMutex = threading.Lock()
 
     def start(self, port, baudrate):
         result = True
 
-        if self.__status:
+        if self.status:
             result = False
 
         if result:
             try:
-                self.__status = True
+                self.status = True
                 self.__serial = serial.serial_for_url(
                 port,
                 baudrate,
@@ -79,22 +96,69 @@ class SerialConnection(object):
         return result
 
     def stop(self):
-        self.__status = False
+        self.status = False
         if self.__serial is not None:
             self.__serial.close()
 
+    def _timeoutHandler(self):
+        self.__cmdMutex.aquire()
+
+        if self.__waitingAnswer:
+            self.__currCommand.respError = True
+            self.__waitingAnswer = False
+
+        self.__cmdMutex.release()
+
+    def sendCommand(self, newCommand):
+
+        self.__cmdMutex.aquire()
+
+        # Check if we are waiting for an answer
+        if self.__waitingAnswer:
+            self.__cmdMutex.release()
+            return False
+
+        self.__cmdMutex.release()
+
+        res = True
+        # Known command
+        if newCommand.cmd in commandsList:
+            self.__waitingAnswer = True
+            self.__currCommand = newCommand
+            self.writeRaw(commandsList[newCommand.cmd])
+            self.__TOTimer.start()
+        else:
+            res = False
+
+        return res
+
+    def processAnswer(self, data):
+        res = True
+        searchObj = re.search(commandsList[self.__currCommand.cmd][2], data, re.I)
+        if searchObj:
+            print "Searched ans : ", searchObj.group()
+        return res
+
     def reader(self):
         try:
-            while self.__status:
+            while self.status:
                 # read all that is there or wait for one byte
                 #print >> sys.stdout, "wait"
                 data = self.__serial.read(self.__serial.in_waiting or 1)
                 #print >> sys.stdout, "rx"
                 if data:
-                    self.receivedData(data)
-                    print >> sys.stdout, data
+                    self.__cmdMutex.aquire()
+                    self.__TOTimer.stop()
+                    if self.__waitingAnswer:
+                        self.__waitingAnswer = False
+                        self.__cmdMutex.release()
+                    else:
+                        self.__cmdMutex.release()
+                        self.receivedData(data)
+                        print >> sys.stdout, data
+                        
         except serial.SerialException:
-            self.__status = False
+            self.status = False
 
     def writeRaw(self, data):
         print >> sys.stdout, "tx"
