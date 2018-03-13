@@ -20,24 +20,38 @@ def getPortsList():
     return ports
 
 
-# Command List [id, command, params, return]
-commandsList = {'AT': ['AT', '', 'OK'],
-                'ATI': ['ATI', '', '(.*) OK'],
-                'CPIN': ['AT+CPIN', '', '+CPIN:(.*)'],
-                'CSQ': ['AT+CSQ', '', '+CSQ:(\d+)'],
-                'CGATT': ['AT+CGATT', '', '+CGATT:(\d+)'],
-                'CIPMUX': ['AT+CIPMUX', '', '+CIPMUX'],
-                'CIPMODE': ['AT+CIPMODE','"%val1%,%val2%,%val3%"', 'OK'],
-                'CSTT': ['AT+CSTT','"%val1%,%val2%,%val3%"', 'OK'],
-                'CIICR': ['AT+CIICR', '', 'OK'],
-                'CIFSR': ['AT+CIFSR', '', '(.*)'],
-                'CIPSTART': ['AT+CIPSTART', '"%val1","%val2","%val3"', 'OK'], #"[TCP/UDP]", "<ip_dest>", "<port>"
-                'CIPSEND': ['AT+CIPSEND', '', '>'],
-                'CIPCLOSE': ['AT+CIPCLOSE', '', 'OK'],
-                'CIPCCFG': ['AT+CIPCCFG', '', 'OK'] }
-
+AT_CMD_ID = 'AT'
+ATI_CMD_ID = 'ATI'
+                    'CPIN'
+                    'CSQ'
+                    'CGATT'
+                    'CIPMUX'
+                    'CIPMODE'
+                    'CSTT'
+                    'CIICR'
+                    'CIFSR'
+                    'CIPSTART'
+                    'CIPSEND'
+                    'CIPCLOSE'
+                    'CIPCCFG'
 
 class ATcommand(object):
+
+    # Command List [id, command, params, return]
+    commandsList = {'AT': ['AT', '', 'OK'],
+                    'ATI': ['ATI', '', '(.*) OK'],
+                    'CPIN': ['AT+CPIN', '', '+CPIN:(.*)'],
+                    'CSQ': ['AT+CSQ', '', '+CSQ:(\d+)'],
+                    'CGATT': ['AT+CGATT', '', '+CGATT:(\d+)'],
+                    'CIPMUX': ['AT+CIPMUX', '', '+CIPMUX'],
+                    'CIPMODE': ['AT+CIPMODE', '"%val1%,%val2%,%val3%"', 'OK'],
+                    'CSTT': ['AT+CSTT', '"%val1%,%val2%,%val3%"', 'OK'],
+                    'CIICR': ['AT+CIICR', '', 'OK'],
+                    'CIFSR': ['AT+CIFSR', '', '(.*)'],
+                    'CIPSTART': ['AT+CIPSTART', '"%val1","%val2","%val3"', 'OK'],  # "[TCP/UDP]", "<ip_dest>", "<port>"
+                    'CIPSEND': ['AT+CIPSEND', '', '>'],
+                    'CIPCLOSE': ['AT+CIPCLOSE', '', 'OK'],
+                    'CIPCCFG': ['AT+CIPCCFG', '', 'OK']}
 
     def __init__(self, cmdId, setMode, params):
         self.cmd = cmdId
@@ -46,6 +60,13 @@ class ATcommand(object):
         self.paramString = ''
         self.answer = ''
         self.respError = False
+
+    def getSetString(self):
+
+        return commandsList[newCommand.cmd][0] + self.paramString + "\r\n"
+
+    def getQueryString(self):
+        return commandsList[newCommand.cmd][0] + "=?\r\n"
 
 
 class SerialConnection(object):
@@ -60,7 +81,7 @@ class SerialConnection(object):
         self.__currCommand = None
         self.__waitingAnswer = False
         # 5 seconds timeout
-        self.__TOTimer = Timer(5, self._timeoutHandler)
+        self.__TOTimer = None
         self.__cmdMutex = threading.Lock()
 
     def start(self, port, baudrate):
@@ -101,7 +122,7 @@ class SerialConnection(object):
             self.__serial.close()
 
     def _timeoutHandler(self):
-        self.__cmdMutex.aquire()
+        self.__cmdMutex.acquire()
 
         if self.__waitingAnswer:
             self.__currCommand.respError = True
@@ -111,7 +132,7 @@ class SerialConnection(object):
 
     def sendCommand(self, newCommand):
 
-        self.__cmdMutex.aquire()
+        self.__cmdMutex.acquire()
 
         # Check if we are waiting for an answer
         if self.__waitingAnswer:
@@ -121,11 +142,13 @@ class SerialConnection(object):
         self.__cmdMutex.release()
 
         res = True
-        # Known command
+        # Known command ?
         if newCommand.cmd in commandsList:
             self.__waitingAnswer = True
             self.__currCommand = newCommand
-            self.writeRaw(commandsList[newCommand.cmd])
+            if self.__currCommand.setOperation:
+                self.writeRaw(self.__currCommand.getSetString())
+            self.__TOTimer = threading.Timer(5, self._timeoutHandler)
             self.__TOTimer.start()
         else:
             res = False
@@ -143,12 +166,14 @@ class SerialConnection(object):
         try:
             while self.status:
                 # read all that is there or wait for one byte
-                #print >> sys.stdout, "wait"
+                print >> sys.stdout, "wait"
                 data = self.__serial.read(self.__serial.in_waiting or 1)
-                #print >> sys.stdout, "rx"
+                print >> sys.stdout, "rx"
                 if data:
-                    self.__cmdMutex.aquire()
-                    self.__TOTimer.stop()
+                    print >> sys.stdout, data
+                    self.__cmdMutex.acquire()
+                    self.__TOTimer.cancel()
+                    self.__waitingAnswer = False  #DELETEME
                     if self.__waitingAnswer:
                         self.__waitingAnswer = False
                         self.__cmdMutex.release()
@@ -161,7 +186,7 @@ class SerialConnection(object):
             self.status = False
 
     def writeRaw(self, data):
-        print >> sys.stdout, "tx"
+        print >> sys.stdout, "tx", data
         self.__serial.write(data)
 
 

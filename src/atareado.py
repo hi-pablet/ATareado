@@ -12,7 +12,7 @@ class ATareado(form.MainFrame):
     def __init__(self, parent):
         form.MainFrame.__init__(self, parent)
         self.__serialPort = serialconnection.SerialConnection()
-        self.__serialPort.receivedData = rxDataCallback
+        self.__serialPort.receivedData = self.rxDataCallback
         self.__cmdSent = None
 
     def start(self):
