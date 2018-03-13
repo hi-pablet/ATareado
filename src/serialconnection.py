@@ -6,6 +6,7 @@ import sys
 from pprint import pprint
 import re
 from serial.tools.list_ports import comports
+from Queue import Queue
 
 #--------------------------------------
 def getPortsList():
@@ -99,6 +100,16 @@ class SerialConnection(object):
     def __init__(self):
         self.status = False
         self.__readThread = None
+        self.__readThread = threading.Thread(target=self.reader, args=())
+        self.__readThread.daemon = True
+
+        self.__writeThread = None
+        self.__writeThread = threading.Thread(target=self.reader, args=())
+        self.__writeThread.daemon = True
+
+        self.__cmdQueue = Queue()
+        self.__cmdProcesssedEvent = threading.Event()
+
         self.__serial = None
         self.__currCommand = None
         self.__waitingAnswer = False
@@ -131,9 +142,7 @@ class SerialConnection(object):
                 result = False
 
             if result:
-                # start serial->console thread
-                self.__readThread = threading.Thread(target=self.reader, args=())
-                self.__readThread.daemon = True
+                # start thread
                 self.__readThread.start()
 
         return result
@@ -152,33 +161,47 @@ class SerialConnection(object):
             self.__waitingAnswer = False
             self.receivedAnswer((False, "Timeout"))
 
+        self.__cmdProcesssedEvent.set()
         self.__cmdMutex.release()
 
     def sendCommand(self, newCommand):
 
-        self.__cmdMutex.acquire()
+        self.__cmdQueue.put(newCommand)
 
-        # Check if we are waiting for an answer
-        if self.__waitingAnswer:
-            self.__cmdMutex.release()
-            return False
 
-        self.__cmdMutex.release()
+    def writer(self):
+        try:
+            while self.status:
 
-        res = True
-        self.__waitingAnswer = True
-        self.__currCommand = newCommand
-        if self.__currCommand.setOperation:
-            self.writeRaw(self.__currCommand.getSetString())
-        else:
-            self.writeRaw(self.__currCommand.getQueryString())
-        # Start timeout
-        print >> sys.stdout, "Start timeout timer"
-        self.__TOTimer = threading.Timer(5, self._timeoutHandler)
-        self.__TOTimer.start()
+                newCmd = self.__cmdQueue.get(True)
 
-        return res
+                if newCmd is None:
+                    raise Exception("Exit thread")
 
+                self.__cmdMutex.acquire()
+
+                # Check if we are waiting for an answer
+                if self.__waitingAnswer:
+                    self.__cmdMutex.release()
+
+                self.__cmdMutex.release()
+
+                self.__waitingAnswer = True
+                self.__currCommand = newCmd
+                if self.__currCommand.setOperation:
+                    self.writeRaw(self.__currCommand.getSetString())
+                else:
+                    self.writeRaw(self.__currCommand.getQueryString())
+
+                # Start timeout
+                #print >> sys.stdout, "Start timeout timer"
+                self.__TOTimer = threading.Timer(5, self._timeoutHandler)
+                self.__TOTimer.start()
+
+                self.__cmdProcesssedEvent.wait()
+
+        except:
+            pass
 
     def reader(self):
         try:
@@ -203,8 +226,9 @@ class SerialConnection(object):
                             self.__TOTimer.cancel()
                             self.__waitingAnswer = False
                             answerString = ''
-                            print "Answer: "
-                            print(', '.join(map(str, answer)))
+                            #print "Answer: "
+                            #print(', '.join(map(str, answer)))
+                            self.__cmdProcesssedEvent.set()
                             self.receivedAnswer(answer)
                         self.__cmdMutex.release()
 
