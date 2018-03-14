@@ -1,0 +1,5 @@
+<ATSCRIPT>
+    <cmd id="CSTT" setMode="1" params="orangeworld|orange|orange" />
+    <cmd id="CIICR" setMode="1" params="" />
+    <cmd id="CIFSR" setMode="0" params="" />
+</ATSCRIPT>

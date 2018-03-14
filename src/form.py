@@ -136,6 +136,7 @@ class MainFrame ( wx.Frame ):
 		self.conn_button.Bind( wx.EVT_BUTTON, self.conn_button_onclick )
 		self.m_button5.Bind( wx.EVT_BUTTON, self.info_button_onclick )
 		self.m_button6.Bind( wx.EVT_BUTTON, self.status_button_onclick )
+		self.run_script_button.Bind( wx.EVT_BUTTON, self.script_button_onclick )
 
 	def __del__( self ):
 		pass
@@ -149,4 +150,7 @@ class MainFrame ( wx.Frame ):
 		event.Skip()
 
 	def status_button_onclick( self, event ):
+		event.Skip()
+
+	def script_button_onclick( self, event ):
 		event.Skip()

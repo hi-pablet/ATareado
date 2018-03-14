@@ -1,12 +1,16 @@
 #!/usr/bin/python
-
 import wx
 from wx.lib.pubsub import setupkwargs
 from wx.lib.pubsub import pub
-import atframe
-import serialconnection
-from serial.tools.list_ports import comports
 import form
+import serialconnection
+import atcmds
+from atcmds import ATcommand
+from serial.tools.list_ports import comports
+import scriptsreader
+
+SCRIPTS_PATH = './scripts/'
+
 
 class ATareado(form.MainFrame):
 
@@ -19,12 +23,20 @@ class ATareado(form.MainFrame):
         self.__cmdSent = None
         pub.subscribe(self.AppendLogText, "AppendLogText")
         pub.subscribe(self.SetStatusText, "SetStatusText")
+        self.Bind(wx.EVT_CLOSE, self.OnClose)
 
-    def start(self):
+    def initialize(self):
         serialPorts = serialconnection.getPortsList()
         self.port_combo.Clear()
         self.port_combo.AppendItems(serialPorts)
         self.setConnectionStatus(False)
+        scripts = scriptsreader.loadAllScripts(SCRIPTS_PATH)
+        self.m_comboBox3.Clear()
+        self.m_comboBox3.AppendItems(scripts)
+
+    def OnClose(self, event):
+        self.__serialPort.stop()
+        self.Destroy()
 
     def setConnectionStatus(self, status):
         if status:
@@ -39,21 +51,42 @@ class ATareado(form.MainFrame):
 
     def info_button_onclick(self, event):
         if self.__serialPort.status:
-            self.log_text.AppendText("Modem Info: \n")
-            cmd = serialconnection.ATcommand(serialconnection.ATI_CMD_ID, True, None)
+            self.log_text.AppendText("\nModem Info:")
+            cmd = ATcommand(atcmds.ATI_CMD_ID, True, None)
             self.__serialPort.sendCommand(cmd)
         else:
-            self.log_text.AppendText("Serial connection closed\n")
+            self.log_text.AppendText("\nSerial connection closed")
 
     def status_button_onclick(self, event):
         if self.__serialPort.status:
-            self.log_text.AppendText("Modem Status:")
+            self.log_text.AppendText("\nSignal Quality:")
+
+            cmd = ATcommand(atcmds.CPIN_CMD_ID, False, None)
+            self.__serialPort.sendCommand(cmd)
+            cmd = ATcommand(atcmds.CSQ_CMD_ID, False, None)
+            self.__serialPort.sendCommand(cmd)
+            #cmd = ATcommand(atcmds.CGATT_CMD_ID, False, None)
+            #self.__serialPort.sendCommand(cmd)
         else:
-            self.log_text.AppendText("Serial connection closed\n")
+            self.log_text.AppendText("\nSerial connection closed")
+
+    def script_button_onclick(self, event):
+        print self.m_comboBox3.GetValue()
+        self.runScript(self.m_comboBox3.GetValue())
+
+    def runScript(self, name):
+        if name in scriptsreader.scriptsList:
+            script = scriptsreader.scriptsList[name]
+            for cmd in script:
+                self.__serialPort.sendCommand(cmd)
+
 
     def rxDataCallback(self, data):
         self.log_text.AppendText('\n')
-        self.log_text.AppendText(data)
+        try:
+            self.log_text.AppendText(data)
+        except Exception as e:
+            print >> sys.stdout, "Exception writing to log_text %s" % e
 
     def rxAnswerCallback(self, answer):
 
@@ -77,7 +110,7 @@ if __name__ == "__main__":
     app = wx.App(False)
 
     atareado = ATareado(None)
-    atareado.start()
+    atareado.initialize()
     atareado.Show()
 
     app.MainLoop()
