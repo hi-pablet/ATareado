@@ -1,4 +1,5 @@
 #!/usr/bin/python
+import codecs
 import serial
 import time
 import threading
@@ -7,6 +8,10 @@ from serial.tools.list_ports import comports
 from Queue import Queue
 from atcmds import commandsList
 from atcmds import ATcommand
+from atcmds import ATresponse
+
+codecs.register(lambda c: hexlify_codec.getregentry() if c == 'hexlify' else None)
+
 
 #--------------------------------------
 def getPortsList():
@@ -46,6 +51,10 @@ class SerialConnection(object):
         # 5 seconds timeout
         self.__TOTimer = None
         self.__cmdMutex = threading.Lock()
+        self.input_encoding = 'UTF-8'
+        self.output_encoding = 'UTF-8'
+        self.__rx_decoder = codecs.getincrementaldecoder('UTF-8')('replace')
+        self.__tx_decoder = codecs.getincrementalencoder('UTF-8')('replace')
 
     def start(self, port, baudrate):
         result = True
@@ -94,13 +103,15 @@ class SerialConnection(object):
     def _timeoutHandler(self):
         try:
             print "Command response timeout, command %s" % self.__currCommand.cmd
+            answer = None
             self.__cmdMutex.acquire()
             if self.__waitingAnswer:
-                self.__currCommand.respError = True
                 self.__waitingAnswer = False
-                self.receivedAnswer((False, "Timeout"))
-
+                answer = ATresponse(False, self.__currCommand.cmd, ["Timeout"])
             self.__cmdMutex.release()
+
+            if answer is not None:
+                self.receivedAnswer(answer)
         except:
             print "Timeout handler exception"
 
@@ -118,10 +129,11 @@ class SerialConnection(object):
                 print >> sys.stdout, "[W]queue Get"
                 newCmd = self.__cmdQueue.get(True)
 
-                print >> sys.stdout, "[W]new cmd %s" % newCmd.cmd
-
                 if newCmd is None:
+                    #Exit from queue block
                     raise Exception("Exit thread")
+
+                print >> sys.stdout, "[W]new cmd %s" % newCmd.cmd
 
                 self.__cmdMutex.acquire()
 
@@ -129,10 +141,7 @@ class SerialConnection(object):
                 self.__waitingAnswer = True
 
                 self.__currCommand = newCmd
-                if self.__currCommand.setOperation:
-                    self.writeRaw(self.__currCommand.getSetString())
-                else:
-                    self.writeRaw(self.__currCommand.getQueryString())
+                self.writeRaw(self.__currCommand.getString())
 
                 self.__cmdMutex.release()
 
@@ -159,20 +168,21 @@ class SerialConnection(object):
                 print >> sys.stdout, "[R]rx"
 
                 if readBytes and self.status:
-                    print >> sys.stdout, readBytes
+                    text = self.__rx_decoder.decode(readBytes)
+                    print >> sys.stdout, text
                     self.__cmdMutex.acquire()
                     #self.__waitingAnswer = False  #DELETEME
 
                     if self.__waitingAnswer:
-                        answerString += readBytes
+                        answerString += text
                         answer = self.__currCommand.parseResponse(answerString)
 
                         # Expected answer
-                        if answer[0]:
+                        if answer is not None:
                             self.__TOTimer.cancel()
                             self.__waitingAnswer = False
                             answerString = ''
-                            print "[R]Answer: "
+                            #print "[R]Answer: "
                             #print(', '.join(map(str, answer)))
                             self.__cmdProcesssedEvent.set()
                             self.receivedAnswer(answer)
@@ -189,7 +199,7 @@ class SerialConnection(object):
     def writeRaw(self, data):
         if self.status:
             print >> sys.stdout, "tx", data
-            self.__serial.write(data)
+            self.__serial.write(self.__tx_decoder.encode(data))
 
 
 def printerCallback(data):

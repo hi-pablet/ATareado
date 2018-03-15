@@ -1,4 +1,5 @@
 #!/usr/bin/python
+import sys
 import wx
 from wx.lib.pubsub import setupkwargs
 from wx.lib.pubsub import pub
@@ -7,9 +8,11 @@ import serialconnection
 import atcmds
 from atcmds import ATcommand
 from serial.tools.list_ports import comports
+from localsocket import LocalSocket
 import scriptsreader
 
 SCRIPTS_PATH = './scripts/'
+LOCAL_PORT = 5001
 
 
 class ATareado(form.MainFrame):
@@ -21,6 +24,9 @@ class ATareado(form.MainFrame):
         self.__serialPort.receivedData = self.rxDataCallback
         self.__serialPort.receivedAnswer = self.rxAnswerCallback
         self.__cmdSent = None
+        self.__localSocket = LocalSocket()
+        self.__localSocket.connOpenCallback = self.localSocketConnectionOpen
+        self.__localSocket.dataReadCallback = self.localSocketDataRead
         pub.subscribe(self.AppendLogText, "AppendLogText")
         pub.subscribe(self.SetStatusText, "SetStatusText")
         self.Bind(wx.EVT_CLOSE, self.OnClose)
@@ -36,6 +42,7 @@ class ATareado(form.MainFrame):
 
     def OnClose(self, event):
         self.__serialPort.stop()
+        self.__localSocket.stop()
         self.Destroy()
 
     def setConnectionStatus(self, status):
@@ -44,35 +51,51 @@ class ATareado(form.MainFrame):
         else:
             wx.CallAfter(pub.sendMessage, "SetStatusText", text="Disconnected")
 
+    def localSocketConnectionOpen(self):
+        print "Local port conn open"
+
+    def localSocketDataRead(self,data):
+        print 'Socket data rx'
+
     def conn_button_onclick(self, event):
         #self.log_text.AppendText('Conn %s %s '% (self.port_combo.GetValue(), self.m_comboBox2.GetValue()))
-        status = self.__serialPort.start(self.port_combo.GetValue(), self.m_comboBox2.GetValue())
-        self.setConnectionStatus(status)
+        if not self.__serialPort.status:
+            status = self.__serialPort.start(self.port_combo.GetValue(), self.m_comboBox2.GetValue())
+            self.setConnectionStatus(status)
 
-    def info_button_onclick(self, event):
+    def info_buttonOnButtonClick(self, event):
         if self.__serialPort.status:
-            self.log_text.AppendText("\nModem Info:")
             cmd = ATcommand(atcmds.ATI_CMD_ID, True, None)
             self.__serialPort.sendCommand(cmd)
         else:
             self.log_text.AppendText("\nSerial connection closed")
 
-    def status_button_onclick(self, event):
+    def status_buttonOnButtonClick(self, event):
         if self.__serialPort.status:
-            self.log_text.AppendText("\nSignal Quality:")
 
             cmd = ATcommand(atcmds.CPIN_CMD_ID, False, None)
             self.__serialPort.sendCommand(cmd)
-            cmd = ATcommand(atcmds.CSQ_CMD_ID, False, None)
+            cmd = ATcommand(atcmds.CSQ_CMD_ID, True, None)
             self.__serialPort.sendCommand(cmd)
-            #cmd = ATcommand(atcmds.CGATT_CMD_ID, False, None)
-            #self.__serialPort.sendCommand(cmd)
+            cmd = ATcommand(atcmds.CGATT_CMD_ID, False, None)
+            self.__serialPort.sendCommand(cmd)
         else:
             self.log_text.AppendText("\nSerial connection closed")
 
-    def script_button_onclick(self, event):
-        print self.m_comboBox3.GetValue()
-        self.runScript(self.m_comboBox3.GetValue())
+    def run_script_buttonOnButtonClick(self, event):
+        if self.__serialPort.status:
+            self.runScript(self.m_comboBox3.GetValue())
+
+    def clear_buttonOnButtonClick(self,event):
+        self.log_text.SetValue("")
+
+    def send_direct_buttonOnButtonClick(self, event):
+        if self.__serialPort.status:
+            data = self.direct_cmd_text.GetValue()
+            self.__serialPort.writeRaw(data+'\r\n')
+
+    def start_localport_buttonOnButtonClick(self, event):
+        self.__localSocket.start(LOCAL_PORT)
 
     def runScript(self, name):
         if name in scriptsreader.scriptsList:
@@ -90,12 +113,17 @@ class ATareado(form.MainFrame):
 
     def rxAnswerCallback(self, answer):
 
-        if answer[0]:
-            text = "Answer:"
-            for t in answer[1]:
-                text += t
+        if answer.ok:
+            text = '\n'+answer.cmdId+' '+atcmds.commandsList[answer.cmdId][3] + ':\n'
+            if len(answer.params) > 0:
+                for t in answer.params:
+                    text += t+', '
+            else:
+                text += ' OK'
         else:
-            text = "Error:"+answer[1]
+            text = "\nError: "
+            for t in answer.params:
+                text += t+' '
 
         wx.CallAfter(pub.sendMessage, "AppendLogText", text=text)
 
