@@ -9,6 +9,7 @@ from Queue import Queue
 from atcmds import commandsList
 from atcmds import ATcommand
 from atcmds import ATresponse
+from Log import logger
 
 codecs.register(lambda c: hexlify_codec.getregentry() if c == 'hexlify' else None)
 
@@ -31,9 +32,11 @@ class SerialConnection(object):
     #Callback
     receivedData = None
     receivedAnswer = None
+    rawData = None
 
     def __init__(self):
         self.status = False
+        self.rawMode = False
         self.__readThread = None
         self.__readThread = threading.Thread(target=self._reader, args=())
         self.__readThread.daemon = True
@@ -81,7 +84,7 @@ class SerialConnection(object):
                     self.__serial.timeout = 0
 
             except serial.SerialException as e:
-                sys.stderr.write('could not open port {!r}: {}\n'.format(port, e))
+                logger.error('could not open port {!r}: {}\n'.format(port, e))
                 result = False
 
             if result:
@@ -92,17 +95,25 @@ class SerialConnection(object):
         return result
 
     def stop(self):
-        self.status = False
-        # Exit write thread
-        self.__cmdQueue.put(None)
+        if self.status:
+            self.status = False
+            # Exit write thread
+            self.__cmdQueue.put(None)
+            if self.__writeThread.isAlive():
+                self.__writeThread.join()
+            logger.debug("Write thread stopped")
 
-        if self.__serial is not None:
-            self.__serial.cancel_read()
-            self.__serial.close()
+            if self.__serial is not None:
+                self.__serial.cancel_read()
+                self.__serial.close()
+
+            if self.__readThread.isAlive():
+                self.__readThread.join()
+            logger.debug("Read thread stopped")
 
     def _timeoutHandler(self):
         try:
-            print "Command response timeout, command %s" % self.__currCommand.cmd
+            logger.debug( "Command response timeout, command %s" % self.__currCommand.cmd)
             answer = None
             self.__cmdMutex.acquire()
             if self.__waitingAnswer:
@@ -113,7 +124,7 @@ class SerialConnection(object):
             if answer is not None:
                 self.receivedAnswer(answer)
         except:
-            print "Timeout handler exception"
+            logger.error("Timeout handler exception")
 
         self.__cmdProcesssedEvent.set()
 
@@ -126,14 +137,14 @@ class SerialConnection(object):
         self.__cmdProcesssedEvent.clear()
         while self.status:
             try:
-                print >> sys.stdout, "[W]queue Get"
+                logger.debug("[W]queue Get")
                 newCmd = self.__cmdQueue.get(True)
 
                 if newCmd is None:
                     #Exit from queue block
                     raise Exception("Exit thread")
 
-                print >> sys.stdout, "[W]new cmd %s" % newCmd.cmd
+                logger.debug("[W]new cmd %s" % newCmd.cmd)
 
                 self.__cmdMutex.acquire()
 
@@ -141,65 +152,78 @@ class SerialConnection(object):
                 self.__waitingAnswer = True
 
                 self.__currCommand = newCmd
-                self.writeRaw(self.__currCommand.getString())
-
                 self.__cmdMutex.release()
 
+
+                self.writeDirect(self.__currCommand.getString())
+
+
                 # Start timeout
-                print >> sys.stdout, "[W]Start timeout timer"
+                logger.debug("[W]Start timeout timer")
                 self.__TOTimer = threading.Timer(5, self._timeoutHandler)
                 self.__TOTimer.start()
 
-                print >> sys.stdout, "[W]Wait event"
+                logger.debug("[W]Wait event")
                 self.__cmdProcesssedEvent.wait()
                 self.__cmdProcesssedEvent.clear()
-                print >> sys.stdout, "[W]event rx"
+                logger.debug("[W]event rx")
 
             except Exception as e:
-                print >> sys.stdout, "[W]Exception write thread %s" % e
+                logger.error( "[W]Exception write thread %s" % e)
 
     def _reader(self):
         try:
             answerString = ''
             while self.status:
                 # read all that is there or wait for one byte
-                print >> sys.stdout, "[R]wait"
+                logger.debug("[R]wait")
                 readBytes = self.__serial.read(self.__serial.in_waiting or 1)
-                print >> sys.stdout, "[R]rx"
+                logger.debug("[R]rx ")
 
                 if readBytes and self.status:
-                    text = self.__rx_decoder.decode(readBytes)
-                    print >> sys.stdout, text
-                    self.__cmdMutex.acquire()
-                    #self.__waitingAnswer = False  #DELETEME
+                    if not self.rawMode:
+                        text = self.__rx_decoder.decode(readBytes)
+                        self.rawData(text)
 
-                    if self.__waitingAnswer:
-                        answerString += text
-                        answer = self.__currCommand.parseResponse(answerString)
+                        logger.debug('['+text+']')
+                        self.__cmdMutex.acquire()
 
-                        # Expected answer
-                        if answer is not None:
-                            self.__TOTimer.cancel()
-                            self.__waitingAnswer = False
-                            answerString = ''
-                            #print "[R]Answer: "
-                            #print(', '.join(map(str, answer)))
-                            self.__cmdProcesssedEvent.set()
-                            self.receivedAnswer(answer)
-                        self.__cmdMutex.release()
+                        if self.__waitingAnswer:
+                            answerString += text
+                            answer = self.__currCommand.checkResponse(answerString)
 
+                            # Expected answer
+                            if answer is not None:
+                                self.__TOTimer.cancel()
+                                self.__waitingAnswer = False
+                                answerString = ''
+                                logger.debug("[R]Answer ok")
+                                self.__cmdProcesssedEvent.set()
+                                self.receivedAnswer(answer)
+                            self.__cmdMutex.release()
+
+                        else:
+                            self.__cmdMutex.release()
+                            self.receivedData(text)
+                            logger.debug(text)
                     else:
-                        self.__cmdMutex.release()
                         self.receivedData(readBytes)
-                        print >> sys.stdout, readBytes
                         
         except serial.SerialException:
             self.status = False
 
+    def writeDirect(self, data):
+        if self.status:
+            if self.rawMode:
+                self.__serial.write(data)
+            else:
+                logger.debug("tx " + data)
+                self.rawData(data)
+                self.__serial.write(self.__tx_decoder.encode(data))
+
     def writeRaw(self, data):
         if self.status:
-            print >> sys.stdout, "tx", data
-            self.__serial.write(self.__tx_decoder.encode(data))
+            self.__serial.write(data)
 
 
 def printerCallback(data):

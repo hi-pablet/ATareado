@@ -20,7 +20,7 @@ class MainFrame ( wx.Frame ):
 		wx.Frame.__init__ ( self, parent, id = wx.ID_ANY, title = u"ATareado", pos = wx.DefaultPosition, size = wx.Size( 661,551 ), style = wx.DEFAULT_FRAME_STYLE|wx.TAB_TRAVERSAL )
 		
 		self.SetSizeHints( -1, -1 )
-		self.SetForegroundColour( wx.SystemSettings.GetColour( wx.SYS_COLOUR_WINDOW ) )
+		#self.SetForegroundColour( wx.SystemSettings.GetColour( wx.SYS_COLOUR_WINDOW ) )
 		self.SetBackgroundColour( wx.SystemSettings.GetColour( wx.SYS_COLOUR_WINDOW ) )
 		
 		bSizer1 = wx.BoxSizer( wx.VERTICAL )
@@ -110,13 +110,20 @@ class MainFrame ( wx.Frame ):
 		self.m_staticText41.Wrap( -1 )
 		bSizer7.Add( self.m_staticText41, 0, wx.ALL, 5 )
 		
-		self.log_text = wx.TextCtrl( self, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.Size( 300,400 ), wx.TE_MULTILINE|wx.TE_READONLY )
+		self.log_text = wx.TextCtrl( self, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.Size( 300,180 ), wx.TE_MULTILINE|wx.TE_READONLY )
 		bSizer7.Add( self.log_text, 1, wx.EXPAND|wx.BOTTOM|wx.RIGHT, 5 )
 
 		self.clear_button = wx.Button( self, wx.ID_ANY, u"Clear", wx.DefaultPosition, wx.DefaultSize, 0 )
 		bSizer7.Add( self.clear_button, 0, wx.ALL, 5 )
-
-
+		
+		self.m_staticText411 = wx.StaticText( self, wx.ID_ANY, u"AT commands", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.m_staticText411.Wrap( -1 )
+		bSizer7.Add( self.m_staticText411, 0, wx.ALL, 5 )
+		
+		self.atcmd_text = wx.TextCtrl( self, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.Size( 300,180 ), wx.TE_MULTILINE|wx.TE_READONLY )
+		bSizer7.Add( self.atcmd_text, 1, wx.EXPAND|wx.BOTTOM|wx.RIGHT, 5 )
+		
+		
 		fgSizer3.Add( bSizer7, 1, wx.EXPAND|wx.TOP|wx.BOTTOM|wx.RIGHT, 5 )
 
 
@@ -127,18 +134,19 @@ class MainFrame ( wx.Frame ):
 		fgSizer4.SetNonFlexibleGrowMode( wx.FLEX_GROWMODE_SPECIFIED )
 		
 		fgSizer4.SetMinSize( wx.Size( -1,60 ) ) 
-		m_comboBox2Choices = [ u"115200", u"57600", u"38400", u"19200", u"14400", u"9600" ]
+		m_comboBox2Choices = [ u"4000000", u"3686400",u"3200000", u"921600", u"460800", u"230400", u"115200", u"57600", u"38400", u"19200", u"14400", u"9600" ]
 		self.m_comboBox2 = wx.ComboBox( self, wx.ID_ANY, u"Baudrate", wx.DefaultPosition, wx.Size( 120,-1 ), m_comboBox2Choices, 0 )
+		self.m_comboBox2.SetBackgroundColour( wx.SystemSettings.GetColour( wx.SYS_COLOUR_WINDOW ) )
 		fgSizer4.Add( self.m_comboBox2, 0, wx.ALL, 5 )
 
 		port_comboChoices = [ u"COM1", u"COM2", u"COM3", u"COM4", u"COM5", u"COM6", u"COM7", u"COM8", u"COM9", u"COM10", u"COM11", u"COM12", u"COM13", u"COM14", u"COM15", u"COM16", u"COM17", u"COM18", u"COM19", u"COM20" ]
-		self.port_combo = wx.ComboBox( self, wx.ID_ANY, u"Select port", wx.DefaultPosition, wx.DefaultSize, port_comboChoices, 0 )
+		self.port_combo = wx.ComboBox( self, wx.ID_ANY, u"Select port", wx.DefaultPosition, wx.Size( 90,-1 ), port_comboChoices, 0 )
 		fgSizer4.Add( self.port_combo, 0, wx.ALL, 5 )
 
 		self.conn_button = wx.Button( self, wx.ID_ANY, u"Connect", wx.DefaultPosition, wx.DefaultSize, 0 )
 		fgSizer4.Add( self.conn_button, 0, wx.ALL, 5 )
 		
-		self.m_staticText1 = wx.StaticText( self, wx.ID_ANY, u"Disconnected", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.m_staticText1 = wx.StaticText( self, wx.ID_ANY, u"Disconnected", wx.DefaultPosition, wx.Size( -1,-1 ), 0 )
 		self.m_staticText1.Wrap( -1 )
 		fgSizer4.Add( self.m_staticText1, 0, wx.ALL, 10 )
 		

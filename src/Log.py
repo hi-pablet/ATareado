@@ -87,6 +87,14 @@ class CLog:
 
         self.__logsQueue.put(msg)
 
+    def debug(self, text):
+        msg = LogMessage()
+        msg.type = LogType.Debug
+        msg.text = text
+        msg.caller = inspect.stack()[1][3]
+
+        self.__logsQueue.put(msg)
+
     def info(self, text):
         msg = LogMessage()
         msg.type = LogType.Info
@@ -102,6 +110,7 @@ class CLog:
         msg.caller = inspect.stack()[1][3]
 
         self.__logsQueue.put(msg)
+
 
 # Global object
 logger = CLog()

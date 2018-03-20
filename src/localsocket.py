@@ -1,6 +1,9 @@
 import socket
 import threading
 from time import sleep
+from Log import logger
+import Log
+
 
 RX_BUFFER_SIZE = 128
 
@@ -34,9 +37,9 @@ class LocalSocket(object):
                 # Bind the socket to the port
                 server_address = ("", port)  # to connect from outside the machine
                 self.__listenSocket.bind(server_address)
-                Log.logger.info('Starting request port on port %s' % server_address[1])
+                logger.info('Starting request port on port %s' % server_address[1])
             except socket.error, v:
-                Log.logger.error('Error starting Request Port on %s port %s. %s' % (server_address[0], server_address[1], v.strerror))
+                logger.error('Error starting Request Port on %s port %s. %s' % (server_address[0], server_address[1], v.strerror))
                 result = False
         if result:
             __listenThread = threading.Thread(target=self._listen_thread, args=())
@@ -44,11 +47,14 @@ class LocalSocket(object):
         return result
 
     def stop(self):
-        self.__status = False
-        if self.__listenSocket is not None:
-            self.__listenSocket.shutdown(socket.SHUT_RDWR)
-            self.__listenSocket.close()
-
+        if self.__status:
+            self.__status = False
+            if self.__listenSocket is not None:
+                try:
+                    self.__listenSocket.shutdown(socket.SHUT_RDWR)
+                    self.__listenSocket.close()
+                except socket.error, v:
+                    logger.error('Error stoping Socket Port on %s port %s. %s' % (server_address[0], server_address[1], v.strerror))
 
     def _listen_thread(self):
 
@@ -59,7 +65,7 @@ class LocalSocket(object):
             # Listen for incoming connections
             self.__listenSocket.listen(1)
         except socket.error, v:
-            Log.logger.error('Socket error listening', v.strerror)
+            logger.error('Socket error listening', v.strerror)
 
         while self.__status:
 
@@ -69,10 +75,10 @@ class LocalSocket(object):
                 self.__connSocket, client_address = self.__listenSocket.accept()
                 self.connOpen = True
                 self._receive_data()
-                Log.logger.post(Log.LogType.Debug, 'New Connection from ' + client_address[0])
+                logger.post(Log.LogType.Debug, 'New Connection from ' + client_address[0])
 
             except socket.error:
-                Log.logger.error('Exception accepting new connection')
+                logger.error('Exception accepting new connection')
                 self.connOpen = False
 
     def _receive_data(self):
@@ -97,4 +103,4 @@ class LocalSocket(object):
             try:
                 self.__connSocket.sendall(tx_data)
             except socket.error:
-                Log.logger.error("Error sending mesage")
+                logger.error("Error sending mesage")

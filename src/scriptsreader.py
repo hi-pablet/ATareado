@@ -32,7 +32,7 @@ def loadAllScripts(path):
                                             (elem.attrib['setMode'] == '1'),
                                             elem.attrib['params'].split('|'))
                             script.append(cmd)
-                            print "CMD %s, %u, %s" % (cmd.cmd, cmd.setOperation, elem.attrib['params'])
+                            #print "CMD %s, %u, %s" % (cmd.cmd, cmd.setOperation, elem.attrib['params'])
                         else:
                             print "Invalid AT command read %s" % elem.attrib['id']
                     # print "param %s = %s" % (elem.attrib['name'], elem.text)
