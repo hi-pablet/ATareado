@@ -85,6 +85,7 @@ class SerialConnection(object):
 
             except serial.SerialException as e:
                 logger.error('could not open port {!r}: {}\n'.format(port, e))
+                self.status = False
                 result = False
 
             if result:
@@ -146,13 +147,13 @@ class SerialConnection(object):
 
                 logger.debug("[W]new cmd %s" % newCmd.cmd)
 
-                self.__cmdMutex.acquire()
+                #self.__cmdMutex.acquire()
 
                 # Check if we are waiting for an answer
                 self.__waitingAnswer = True
 
                 self.__currCommand = newCmd
-                self.__cmdMutex.release()
+                #self.__cmdMutex.release()
 
 
                 self.writeDirect(self.__currCommand.getString())
@@ -181,11 +182,11 @@ class SerialConnection(object):
                 logger.debug("[R]rx ")
 
                 if readBytes and self.status:
+                    # Check if we are forwarding
                     if not self.rawMode:
                         text = self.__rx_decoder.decode(readBytes)
                         self.rawData(text)
 
-                        logger.debug('['+text+']')
                         self.__cmdMutex.acquire()
 
                         if self.__waitingAnswer:
@@ -197,16 +198,23 @@ class SerialConnection(object):
                                 self.__TOTimer.cancel()
                                 self.__waitingAnswer = False
                                 answerString = ''
+
+                                self.__cmdMutex.release()
+                                logger.debug('[' + text + ']')
                                 logger.debug("[R]Answer ok")
-                                self.__cmdProcesssedEvent.set()
+
                                 self.receivedAnswer(answer)
-                            self.__cmdMutex.release()
+                                self.__cmdProcesssedEvent.set()
+                            else:
+                                self.__cmdMutex.release()
+                                logger.debug('[' + text + ']')
 
                         else:
                             self.__cmdMutex.release()
                             self.receivedData(text)
-                            logger.debug(text)
+                            logger.debug('<'+text+'>')
                     else:
+                        logger.debug('{' + text + '}')
                         self.receivedData(readBytes)
                         
         except serial.SerialException:

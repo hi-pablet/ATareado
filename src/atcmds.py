@@ -81,7 +81,6 @@ class ATcommand(object):
                     self.paramString = self.paramString.replace('%val2%', params[1])
                 if self.paramString.find('%val3%') != -1 and len(params) > 2:
                     self.paramString = self.paramString.replace('%val3%', params[2])
-                print self.paramString
         except:
             logger.error("Exception creating command")
 

@@ -5,6 +5,7 @@ from wx.lib.pubsub import setupkwargs
 from wx.lib.pubsub import pub
 import form
 import serialconnection
+import threading
 import atcmds
 from atcmds import ATcommand
 from serial.tools.list_ports import comports
@@ -31,7 +32,10 @@ class ATareado(form.MainFrame):
         self.__localSocket = LocalSocket()
         self.__localSocket.connOpenCallback = self.localSocketConnectionOpen
         self.__localSocket.dataReadCallback = self.localSocketDataRead
+        self.__localSocket.connClosedCallback = self.localSocketConnectionClosed
         self.__socketRedirection = False
+
+        #self.__guiMutex = threading.Lock()
 
         pub.subscribe(self.AppendLogText, "AppendLogText")
         pub.subscribe(self.SetStatusText, "SetStatusText")
@@ -58,11 +62,17 @@ class ATareado(form.MainFrame):
         self.Destroy()
 
     def setConnectionStatus(self, status):
+        #self.__guiMutex.acquire()
         if status:
             wx.CallAfter(pub.sendMessage, "SetStatusText", text="Connected")
         else:
             wx.CallAfter(pub.sendMessage, "SetStatusText", text="Disconnected")
+        #self.__guiMutex.release()
 
+    ''' =============================
+            Controls event handling
+        =============================
+    '''
     def conn_button_onclick(self, event):
         #self.log_text.AppendText('Conn %s %s '% (self.port_combo.GetValue(), self.m_comboBox2.GetValue()))
         if not self.__serialPort.status:
@@ -133,15 +143,33 @@ class ATareado(form.MainFrame):
             port = int(portTxt)
             self.__localSocket.start(port)
         except:
-            print "Error, invalid port "+portTxt
+            logger.error("Error, invalid port "+portTxt)
 
+    def close_remote_conn_buttonOnButtonClick(self, event):
+        self.__socketRedirection = False
+        self.__serialPort.writeRaw("+++")
+        self.__serialPort.rawMode = False
+        cmd = ATcommand(atcmds.CIPSHUT_CMD_ID, True, None)
+        self.__serialPort.sendCommand(cmd)
+
+    ''' =============================
+            Callbacks handlers
+        =============================
+    '''
     def localSocketConnectionOpen(self):
         self.__socketRedirection = True
         self.__serialPort.rawMode = True
-        print "Local port conn open"
+        logger.info("Local socket, connection open")
+
+        wx.CallAfter(pub.sendMessage, "AppendLogText", text='Local socket connected')
+
+    def localSocketConnectionClosed(self):
+        self.__socketRedirection = False
+        self.__serialPort.writeRaw("+++")
+        self.__serialPort.rawMode = False
 
     def localSocketDataRead(self, data):
-        print "socket wr "+data
+        #print "socket rd "+data
         self.__serialPort.writeRaw(data)
 
     def runScript(self, name):
@@ -153,13 +181,13 @@ class ATareado(form.MainFrame):
 
     def rxDataCallback(self, data):
         if self.__socketRedirection:
-            print "socket rd " + data
+            #print "socket wr " + data
             self.__localSocket.writeData(data)
         else:
             try:
-                self.log_text.AppendText('\n'+data)
+                wx.CallAfter(pub.sendMessage, "AppendLogText", text='\n'+data)
             except Exception as e:
-                print >> sys.stdout, "Exception writing to log_text %s" % e
+                logger.error("Exception writing to log_text" + e)
 
     def rxAnswerCallback(self, answer):
 

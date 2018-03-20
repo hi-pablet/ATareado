@@ -15,6 +15,7 @@ class LocalSocket(object):
     # Callback
     dataReadCallback = None
     connOpenCallback = None
+    connClosedCallback = None
 
     def __init__(self):
         self.__status = False
@@ -49,6 +50,7 @@ class LocalSocket(object):
     def stop(self):
         if self.__status:
             self.__status = False
+            self.connOpen = False
             if self.__listenSocket is not None:
                 try:
                     self.__listenSocket.shutdown(socket.SHUT_RDWR)
@@ -70,28 +72,32 @@ class LocalSocket(object):
         while self.__status:
 
             try:
-                #Log.logger.info('waiting for driver connection')
+                logger.info('Waiting for new connection')
                 # Wait for a connection
                 self.__connSocket, client_address = self.__listenSocket.accept()
+                logger.debug('New Connection from ' + client_address[0])
                 self.connOpen = True
-                self._receive_data()
-                logger.post(Log.LogType.Debug, 'New Connection from ' + client_address[0])
+                self.connOpenCallback()
+
+                if not self._receive_data():
+                    logger.info('Connection closed')
+                    self.connClosedCallback()
 
             except socket.error:
                 logger.error('Exception accepting new connection')
-                self.connOpen = False
+                self.stop()
 
     def _receive_data(self):
 
         rx_error = False
-        while self.__status:
+        while self.__status and not rx_error:
             try:
                 rx_bytes = bytearray(self.__connSocket.recv(RX_BUFFER_SIZE))
 
                 self.dataReadCallback(rx_bytes)
+
             except socket.error:
                 rx_error = True
-                break
 
         return rx_error
 
