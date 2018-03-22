@@ -5,5 +5,4 @@
     <cmd id="CSTT" setMode="1" params="orangeworld|orange|orange" />
     <cmd id="CIICR" setMode="1" params="" />
     <cmd id="CIFSR" setMode="1" params="" />
-    <cmd id="CIPSTART" setMode="1" params="TCP|18.220.184.30|5001" />
 </ATSCRIPT>

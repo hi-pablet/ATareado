@@ -38,12 +38,8 @@ class SerialConnection(object):
         self.status = False
         self.rawMode = False
         self.__readThread = None
-        self.__readThread = threading.Thread(target=self._reader, args=())
-        self.__readThread.daemon = True
 
         self.__writeThread = None
-        self.__writeThread = threading.Thread(target=self._writer, args=())
-        self.__writeThread.daemon = True
 
         self.__cmdQueue = Queue()
         self.__cmdProcesssedEvent = threading.Event()
@@ -68,10 +64,9 @@ class SerialConnection(object):
         if result:
             try:
                 self.status = True
-                self.__serial = serial.serial_for_url(
-                port,
-                baudrate,
-                do_not_open=True)
+                self.__serial = serial.Serial()
+                self.__serial.port = port
+                self.__serial.baudrate = baudrate
 
                 if not hasattr(self.__serial, 'cancel_read'):
                     # enable timeout for alive flag polling if cancel_read is not available
@@ -89,6 +84,11 @@ class SerialConnection(object):
                 result = False
 
             if result:
+                self.__readThread = threading.Thread(target=self._reader, args=())
+                self.__readThread.daemon = True
+                self.__writeThread = threading.Thread(target=self._writer, args=())
+                self.__writeThread.daemon = True
+
                 # start thread
                 self.__readThread.start()
                 self.__writeThread.start()
@@ -112,6 +112,22 @@ class SerialConnection(object):
                 self.__readThread.join()
             logger.debug("Read thread stopped")
 
+    def reconnect(self, port, baudrate):
+        res = True
+        try:
+            if self.status:
+                self.__serial.close()
+                self.status = False
+
+            self.__serial.port = port
+            self.__serial.baudrate = baudrate
+            self.__serial.open()
+            self.status = True
+        except:
+            res = False
+            logger.error("Error reconnecting")
+        return res
+
     def _timeoutHandler(self):
         try:
             logger.debug( "Command response timeout, command %s" % self.__currCommand.cmd)
@@ -130,9 +146,13 @@ class SerialConnection(object):
         self.__cmdProcesssedEvent.set()
 
     def sendCommand(self, newCommand):
+        if self.status:
+            self.__cmdQueue.put(newCommand)
 
-        self.__cmdQueue.put(newCommand)
-
+    def clearCommandsQueue(self):
+        # empty cmdQueue
+        while not self.__cmdQueue.empty():
+            self.__cmdQueue.get(False, 1)
 
     def _writer(self):
         self.__cmdProcesssedEvent.clear()
@@ -145,7 +165,7 @@ class SerialConnection(object):
                     #Exit from queue block
                     raise Exception("Exit thread")
 
-                logger.debug("[W]new cmd %s" % newCmd.cmd)
+                logger.debug("[W]new cmd " + newCmd.cmd)
 
                 #self.__cmdMutex.acquire()
 
@@ -170,7 +190,8 @@ class SerialConnection(object):
                 logger.debug("[W]event rx")
 
             except Exception as e:
-                logger.error( "[W]Exception write thread %s" % e)
+                logger.error("[W]Exception write thread ")
+        logger.debug("exit wr")
 
     def _reader(self):
         try:
@@ -219,15 +240,20 @@ class SerialConnection(object):
                         
         except serial.SerialException:
             self.status = False
+        logger.debug("exit rd")
 
     def writeDirect(self, data):
-        if self.status:
-            if self.rawMode:
-                self.__serial.write(data)
-            else:
-                logger.debug("tx " + data)
-                self.rawData(data)
-                self.__serial.write(self.__tx_decoder.encode(data))
+        try:
+            if self.status:
+                if self.rawMode:
+                    self.__serial.write(data)
+                else:
+                    logger.debug("tx " + data)
+                    self.rawData(data)
+                    self.__serial.write(self.__tx_decoder.encode(data))
+
+        except Exception as e:
+            logger.error("Exception writeDirect " + e.strerror)
 
     def writeRaw(self, data):
         if self.status:

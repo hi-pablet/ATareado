@@ -1,8 +1,11 @@
 import socket
+import select
+import errno
 import threading
 from time import sleep
 from Log import logger
 import Log
+from pprint import pprint
 
 
 RX_BUFFER_SIZE = 128
@@ -18,58 +21,87 @@ class LocalSocket(object):
     connClosedCallback = None
 
     def __init__(self):
-        self.__status = False
+        self.status = False
         self.connOpen = False
+        self.__socketType = ''
         self.__listenSocket = None
         self.__connSocket = None
-        self.__listenThread = None
+        self.__socketThread = None
+        self.__remoteAddress = ('', 5001)
 
-    def start(self, port):
+    def start(self, port, socketType):
         result = True
 
-        if self.__status:
+        if self.status and socketType not in ['TCP','UDP']:
             result = False
-
-        if result:
+        else:
             try:
-                self.__status = True
-                self.__listenSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                if socketType == 'TCP':
+                    self.__listenSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-                # Bind the socket to the port
-                server_address = ("", port)  # to connect from outside the machine
-                self.__listenSocket.bind(server_address)
-                logger.info('Starting request port on port %s' % server_address[1])
+                    # Bind the socket to the port
+                    self.__remoteAddress = ("", port)  # to connect from outside the machine
+                    self.__listenSocket.bind(self.__remoteAddress)
+                    logger.info('Starting request port on port ' + server_address[1])
+                    target = self._listen_thread
+                    self.status = True
+
+                elif socketType == 'UDP':
+                    self.__connSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    self.__remoteAddress = ("127.0.0.1", port)
+                    self.__connSocket.bind(self.__remoteAddress)
+                    self.__connSocket.setblocking(0)
+                    self.__connSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+                    logger.info('Open socket on port ' + str(port))
+                    target = self._udp_listen_thread
+                    self.status = True
+                    self.connOpenCallback()
+
             except socket.error, v:
-                logger.error('Error starting Request Port on %s port %s. %s' % (server_address[0], server_address[1], v.strerror))
+                logger.error('Error starting local socket Port ' + v.strerror)
                 result = False
+
         if result:
-            __listenThread = threading.Thread(target=self._listen_thread, args=())
-            __listenThread.start()
+            self.__socketType = socketType
+            self.__socketThread = threading.Thread(target=target, args=())
+            self.__socketThread.start()
         return result
 
     def stop(self):
-        if self.__status:
-            self.__status = False
+        if self.status:
+            self.status = False
             self.connOpen = False
+
+            if self.__connSocket is not None:
+                try:
+                    self.__connSocket.shutdown(socket.SHUT_RDWR)
+                    self.__connSocket.close()
+                except socket.error, v:
+                    logger.error('Error closing Socket Port' + v.strerror)
+
             if self.__listenSocket is not None:
                 try:
                     self.__listenSocket.shutdown(socket.SHUT_RDWR)
                     self.__listenSocket.close()
                 except socket.error, v:
-                    logger.error('Error stoping Socket Port on %s port %s. %s' % (server_address[0], server_address[1], v.strerror))
+                    logger.error('Error closing Socket Port, ' + v.strerror)
+
+            if self.__socketThread.isAlive():
+                self.__socketThread.join()
 
     def _listen_thread(self):
 
-        if not self.__status:
+        if not self.status:
             return
 
         try:
             # Listen for incoming connections
             self.__listenSocket.listen(1)
         except socket.error, v:
-            logger.error('Socket error listening', v.strerror)
+            logger.error('Socket error listening, ' + v.strerror)
 
-        while self.__status:
+        while self.status:
 
             try:
                 logger.info('Waiting for new connection')
@@ -90,23 +122,62 @@ class LocalSocket(object):
     def _receive_data(self):
 
         rx_error = False
-        while self.__status and not rx_error:
+        while self.status and not rx_error:
             try:
                 rx_bytes = bytearray(self.__connSocket.recv(RX_BUFFER_SIZE))
-
-                self.dataReadCallback(rx_bytes)
+                if rx_bytes is not None:
+                    self.dataReadCallback(rx_bytes)
+                else:
+                    # Connection closed
+                    rx_error = True
 
             except socket.error:
                 rx_error = True
 
         return rx_error
 
-    def writeData(self, tx_data):
-        #Build message
+    def _udp_listen_thread(self):
 
-        #print "Sending message %s length %d payload [%d]" % (message, len(message), len(payload))
-        if self.__status:
+        rx_error = False
+
+        while self.status and not rx_error:
             try:
-                self.__connSocket.sendall(tx_data)
+                ready_to_read, ready_to_write, in_error = select.select(
+                    [self.__connSocket],
+                    [self.__connSocket], [])
+
+                if ready_to_read:
+                    data, addr = self.__connSocket.recvfrom(RX_BUFFER_SIZE)
+
+                    #print "Message received %s" % data
+                    if data:
+                        rx_bytes = bytearray(data)
+                        self.dataReadCallback(rx_bytes)
+                elif ready_to_write:
+                    continue
+                else:
+                    # Connection closed
+                    rx_error = True
+
+            except socket.error, v:
+                #if v.args[0] == errno.EWOULDBLOCK:
+                    # connection closed
+                    #continue
+                #else:
+                rx_error = True
+                logger.error('Exception receiving data new connection, ' + v.strerror)
+
+        return rx_error
+
+
+    def writeData(self, tx_data):
+
+        #print "Sending message %s length %d" % (tx_data, len(tx_data))
+        if self.status:
+            try:
+                if self.__socketType == 'TCP':
+                    self.__connSocket.sendall(tx_data)
+                else:
+                    self.__connSocket.sendto(tx_data, self.__remoteAddress)
             except socket.error:
                 logger.error("Error sending mesage")

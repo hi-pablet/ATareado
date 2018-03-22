@@ -102,7 +102,7 @@ class MainFrame ( wx.Frame ):
 		fgSizer5.Add( self.start_localport_button, 0, wx.ALL, 5 )
 		
 		
-		fgSizer5.AddSpacer( ( 0, 0), 1, wx.EXPAND, 5 )
+		fgSizer5.AddSpacer( 0 )
 		
 		self.m_staticText71 = wx.StaticText( self.m_panel2, wx.ID_ANY, u"Remote port", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText71.Wrap( -1 )
@@ -115,7 +115,7 @@ class MainFrame ( wx.Frame ):
 		self.m_staticText8.Wrap( -1 )
 		fgSizer5.Add( self.m_staticText8, 0, wx.ALL, 5 )
 		
-		self.remoteaddress_text = wx.TextCtrl( self.m_panel2, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.remoteaddress_text = wx.TextCtrl( self.m_panel2, wx.ID_ANY, u"18.220.184.30", wx.DefaultPosition, wx.DefaultSize, 0 )
 		fgSizer5.Add( self.remoteaddress_text, 0, wx.ALL, 5 )
 		
 		self.connect_remote_button = wx.Button( self.m_panel2, wx.ID_ANY, u"Connect", wx.DefaultPosition, wx.DefaultSize, 0 )
@@ -175,7 +175,8 @@ class MainFrame ( wx.Frame ):
 		fgSizer4.SetFlexibleDirection( wx.BOTH )
 		fgSizer4.SetNonFlexibleGrowMode( wx.FLEX_GROWMODE_SPECIFIED )
 		
-		fgSizer4.SetMinSize( wx.Size( -1,60 ) ) 
+		fgSizer4.SetMinSize( wx.Size( -1,60 ) )
+		fgSizer4.AddSpacer(40)
 		m_comboBox2Choices = [ u"4000000", u"3686400",u"3200000", u"921600", u"460800", u"230400", u"115200", u"57600", u"38400", u"19200", u"14400", u"9600" ]
 		self.m_comboBox2 = wx.ComboBox( self, wx.ID_ANY, u"Baudrate", wx.DefaultPosition, wx.Size( 120,-1 ), m_comboBox2Choices, 0 )
 		self.m_comboBox2.SetBackgroundColour( wx.SystemSettings.GetColour( wx.SYS_COLOUR_WINDOW ) )

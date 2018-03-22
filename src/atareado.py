@@ -12,6 +12,7 @@ from serial.tools.list_ports import comports
 from localsocket import LocalSocket
 import scriptsreader
 import Log
+import time
 from Log import logger
 
 
@@ -35,7 +36,8 @@ class ATareado(form.MainFrame):
         self.__localSocket.connClosedCallback = self.localSocketConnectionClosed
         self.__socketRedirection = False
 
-        #self.__guiMutex = threading.Lock()
+        self.__answerHandler = {atcmds.CIPSTART_CMD_ID:  self._answerCIPSTARTHandler,
+                                atcmds.IPR_CMD_ID:       self._answerIPRHandler}
 
         pub.subscribe(self.AppendLogText, "AppendLogText")
         pub.subscribe(self.SetStatusText, "SetStatusText")
@@ -54,20 +56,21 @@ class ATareado(form.MainFrame):
 
     def OnClose(self, event):
         try:
-            self.__serialPort.stop()
+            # Set auto baudrate detection as default
+            if self.__serialPort.status:
+                self.__serialPort.writeDirect("AT+IPR=0\r\n")
             self.__localSocket.stop()
             logger.stop()
+            self.__serialPort.stop()
         except:
             print "Error stoping ports"
         self.Destroy()
 
     def setConnectionStatus(self, status):
-        #self.__guiMutex.acquire()
         if status:
             wx.CallAfter(pub.sendMessage, "SetStatusText", text="Connected")
         else:
             wx.CallAfter(pub.sendMessage, "SetStatusText", text="Disconnected")
-        #self.__guiMutex.release()
 
     ''' =============================
             Controls event handling
@@ -79,31 +82,31 @@ class ATareado(form.MainFrame):
             connected = True
             baudrate = self.m_comboBox2.GetValue()
 
+            iprCmd = None
+
             if int(baudrate) > 115200:
-                # TODO: handle response
-                self.__serialPort.receivedAnswer = self.rxAnswerReconectCallback
-                if self.__serialPort.start(self.port_combo.GetValue(), 115200):
-                    cmd = ATcommand(atcmds.AT_CMD_ID, True, None)
-                    self.__serialPort.sendCommand(cmd)
-                    cmd = ATcommand(atcmds.ATE0_CMD_ID, True, None)
-                    self.__serialPort.sendCommand(cmd)
-                    cmd = ATcommand(atcmds.IPR_CMD_ID, True, [baudrate])
-                    self.__serialPort.sendCommand(cmd)
-                else:
-                    connected = False
+                iprCmd = ATcommand(atcmds.IPR_CMD_ID, True, [baudrate])
+                baudrate = "115200"
+
+            if self.__serialPort.start(self.port_combo.GetValue(), baudrate):
+                self.setConnectionStatus(True)
+                cmd = ATcommand(atcmds.AT_CMD_ID, True, None)
+                self.__serialPort.sendCommand(cmd)
+                cmd = ATcommand(atcmds.ATE0_CMD_ID, True, None)
+                self.__serialPort.sendCommand(cmd)
+                if iprCmd is not None:
+                    self.__serialPort.sendCommand(iprCmd)
             else:
-                self.__serialPort.receivedAnswer = self.rxAnswerCallback
-                if self.__serialPort.start(self.port_combo.GetValue(), baudrate):
-                    self.setConnectionStatus(True)
-                    cmd = ATcommand(atcmds.AT_CMD_ID, True, None)
-                    self.__serialPort.sendCommand(cmd)
-                    cmd = ATcommand(atcmds.ATE0_CMD_ID, True, None)
-                    self.__serialPort.sendCommand(cmd)
-                else:
-                    connected = False
+                connected = False
 
             if not connected:
                 self.log_text.AppendText('Error: Could not connect to serial port!')
+            else:
+                self.conn_button.SetLabelText('Disconnect')
+        else:
+            self.__serialPort.writeDirect("AT+IPR=0\r\n")
+            self.__serialPort.stop()
+            self.conn_button.SetLabelText('Connect')
 
 
     def info_buttonOnButtonClick(self, event):
@@ -129,7 +132,11 @@ class ATareado(form.MainFrame):
         if self.__serialPort.status:
             self.runScript(self.m_comboBox3.GetValue())
 
-    def clear_buttonOnButtonClick(self,event):
+    # Stop current script
+    def stop_buttonOnButtonClick(self, event):
+        self.__serialPort.clearCommandsQueue()
+
+    def clear_buttonOnButtonClick(self, event):
         self.log_text.SetValue("")
 
     def send_direct_buttonOnButtonClick(self, event):
@@ -138,19 +145,36 @@ class ATareado(form.MainFrame):
             self.__serialPort.writeDirect(data+'\r\n')
 
     def start_localport_buttonOnButtonClick(self, event):
-        portTxt = self.localport_text.GetValue()
-        try:
-            port = int(portTxt)
-            self.__localSocket.start(port)
-        except:
-            logger.error("Error, invalid port "+portTxt)
+        if not self.__localSocket.status:
+            portTxt = self.localport_text.GetValue()
+            try:
+                port = int(portTxt)
+                self.__localSocket.start(port, 'UDP')
+                self.start_localport_button.SetLabelText('Stop Listening')
+            except:
+                logger.error("Error, invalid port "+portTxt)
+        else:
+            self.__localSocket.stop()
+            self.start_localport_button.SetLabelText('Start Listening')
+
+        self.start_localport_button.Refresh()
+
 
     def close_remote_conn_buttonOnButtonClick(self, event):
-        self.__socketRedirection = False
-        self.__serialPort.writeRaw("+++")
-        self.__serialPort.rawMode = False
-        cmd = ATcommand(atcmds.CIPSHUT_CMD_ID, True, None)
-        self.__serialPort.sendCommand(cmd)
+        if self.__serialPort.status:
+            self.__socketRedirection = False
+            self.__serialPort.writeDirect("+++")
+            self.__serialPort.rawMode = False
+            time.sleep(2)
+            cmd = ATcommand(atcmds.CIPSHUT_CMD_ID, True, None)
+            self.__serialPort.sendCommand(cmd)
+
+    def connect_remote_buttonOnButtonClick(self, event):
+        # Get addr
+        if self.__serialPort.status:
+            params = ["UDP", self.remoteaddress_text.GetValue(), self.remoteport_text.GetValue()]
+            cmd = ATcommand(atcmds.CIPSTART_CMD_ID, True, params)
+            self.__serialPort.sendCommand(cmd)
 
     ''' =============================
             Callbacks handlers
@@ -158,19 +182,17 @@ class ATareado(form.MainFrame):
     '''
     def localSocketConnectionOpen(self):
         self.__socketRedirection = True
-        self.__serialPort.rawMode = True
         logger.info("Local socket, connection open")
-
         wx.CallAfter(pub.sendMessage, "AppendLogText", text='Local socket connected')
 
     def localSocketConnectionClosed(self):
         self.__socketRedirection = False
-        self.__serialPort.writeRaw("+++")
-        self.__serialPort.rawMode = False
 
     def localSocketDataRead(self, data):
         #print "socket rd "+data
-        self.__serialPort.writeRaw(data)
+        #print "*"
+        if self.__serialPort.status:
+            self.__serialPort.writeDirect(data)
 
     def runScript(self, name):
         if name in scriptsreader.scriptsList:
@@ -182,14 +204,19 @@ class ATareado(form.MainFrame):
     def rxDataCallback(self, data):
         if self.__socketRedirection:
             #print "socket wr " + data
+            #print "."
             self.__localSocket.writeData(data)
         else:
             try:
-                wx.CallAfter(pub.sendMessage, "AppendLogText", text='\n'+data)
+                wx.CallAfter(pub.sendMessage, "AppendLogText", text=data)
             except Exception as e:
                 logger.error("Exception writing to log_text" + e)
 
+    # Command answer handler
     def rxAnswerCallback(self, answer):
+
+        if answer.cmdId in self.__answerHandler:
+            self.__answerHandler[answer.cmdId](answer)
 
         if answer.ok:
             text = '\n'+answer.cmdId+' '+atcmds.commandsList[answer.cmdId][3] + ':\n'
@@ -204,6 +231,29 @@ class ATareado(form.MainFrame):
                 text += t+' '
 
         wx.CallAfter(pub.sendMessage, "AppendLogText", text=text)
+
+    def _answerCIPSTARTHandler(self, answer):
+        if answer.ok:
+            self.__serialPort.rawMode = True
+            wx.CallAfter(pub.sendMessage, "AppendLogText", text='\nRemote connection open')
+            logger.info('Remote connection open')
+
+    def _answerIPRHandler(self, answer):
+        if answer.ok:
+            if self.__serialPort.reconnect(self.port_combo.GetValue(), self.m_comboBox2.GetValue()):
+                connected = True
+                cmd = ATcommand(atcmds.AT_CMD_ID, True, None)
+                self.__serialPort.sendCommand(cmd)
+            else:
+                connected = False
+        else:
+            connected = False
+
+        if not connected:
+            wx.CallAfter(pub.sendMessage, "AppendLogText", text='Error: Could not connect to serial port!')
+            self.setConnectionStatus(False)
+        else:
+            self.setConnectionStatus(True)
 
     def rxAnswerReconectCallback(self, answer):
         if answer.cmdId == atcmds.IPR_CMD_ID:
@@ -247,7 +297,7 @@ if __name__ == "__main__":
     atareado.initialize()
     atareado.Show()
 
-    if not logger.start(Log.LogType.Debug):
+    if not logger.start(Log.LogType.Info):
         logger.stop()
         print >> sys.stderr, "Error starting Log"
 
