@@ -34,7 +34,9 @@ class ATareado(form.MainFrame):
         self.__localSocket.connOpenCallback = self.localSocketConnectionOpen
         self.__localSocket.dataReadCallback = self.localSocketDataRead
         self.__localSocket.connClosedCallback = self.localSocketConnectionClosed
+
         self.__socketRedirection = False
+        self.__bridgeOn = False
 
         self.__answerHandler = {atcmds.CIPSTART_CMD_ID:  self._answerCIPSTARTHandler,
                                 atcmds.IPR_CMD_ID:       self._answerIPRHandler}
@@ -144,37 +146,34 @@ class ATareado(form.MainFrame):
             data = self.direct_cmd_text.GetValue()
             self.__serialPort.writeDirect(data+'\r\n')
 
-    def start_localport_buttonOnButtonClick(self, event):
-        if not self.__localSocket.status:
-            portTxt = self.localport_text.GetValue()
-            try:
-                port = int(portTxt)
-                self.__localSocket.start(port, 'UDP')
-                self.start_localport_button.SetLabelText('Stop Listening')
-            except:
-                logger.error("Error, invalid port "+portTxt)
-        else:
-            self.__localSocket.stop()
-            self.start_localport_button.SetLabelText('Start Listening')
-
-        self.start_localport_button.Refresh()
-
 
     def close_remote_conn_buttonOnButtonClick(self, event):
+        self.__socketRedirection = False
         if self.__serialPort.status:
-            self.__socketRedirection = False
             self.__serialPort.writeDirect("+++")
             self.__serialPort.rawMode = False
             time.sleep(2)
             cmd = ATcommand(atcmds.CIPSHUT_CMD_ID, True, None)
             self.__serialPort.sendCommand(cmd)
 
+        if self.__localSocket.status:
+            self.__localSocket.stop()
+
     def connect_remote_buttonOnButtonClick(self, event):
-        # Get addr
         if self.__serialPort.status:
-            params = ["UDP", self.remoteaddress_text.GetValue(), self.remoteport_text.GetValue()]
-            cmd = ATcommand(atcmds.CIPSTART_CMD_ID, True, params)
-            self.__serialPort.sendCommand(cmd)
+            if not self.__bridgeOn:
+                params = [self.conntype_combo.GetValue(),
+                          self.remoteaddress_text.GetValue(),
+                          self.remoteport_text.GetValue()]
+                cmd = ATcommand(atcmds.CIPSTART_CMD_ID, True, params)
+                self.__serialPort.sendCommand(cmd)
+            else:
+                pass
+        #if not self.__localSocket.status:
+        # Get addr
+
+    def _mount_bridge(self, type, remoteAddr, remotePort):
+        pass
 
     ''' =============================
             Callbacks handlers
@@ -183,7 +182,7 @@ class ATareado(form.MainFrame):
     def localSocketConnectionOpen(self):
         self.__socketRedirection = True
         logger.info("Local socket, connection open")
-        wx.CallAfter(pub.sendMessage, "AppendLogText", text='Local socket connected')
+        wx.CallAfter(pub.sendMessage, "AppendLogText", text='Local socket connected\nBridge enabled')
 
     def localSocketConnectionClosed(self):
         self.__socketRedirection = False
@@ -191,7 +190,7 @@ class ATareado(form.MainFrame):
     def localSocketDataRead(self, data):
         #print "socket rd "+data
         #print "*"
-        if self.__serialPort.status:
+        if self.__serialPort.status and self.__socketRedirection:
             self.__serialPort.writeDirect(data)
 
     def runScript(self, name):
@@ -209,8 +208,8 @@ class ATareado(form.MainFrame):
         else:
             try:
                 wx.CallAfter(pub.sendMessage, "AppendLogText", text=data)
-            except Exception as e:
-                logger.error("Exception writing to log_text" + e)
+            except Exception, v:
+                logger.error("Exception writing to log_text " + v.strerror)
 
     # Command answer handler
     def rxAnswerCallback(self, answer):
@@ -222,7 +221,7 @@ class ATareado(form.MainFrame):
             text = '\n'+answer.cmdId+' '+atcmds.commandsList[answer.cmdId][3] + ':\n'
             if len(answer.params) > 0:
                 for t in answer.params:
-                    text += t+', '
+                    text += t + ' '
             else:
                 text += ' OK'
         else:
@@ -233,10 +232,37 @@ class ATareado(form.MainFrame):
         wx.CallAfter(pub.sendMessage, "AppendLogText", text=text)
 
     def _answerCIPSTARTHandler(self, answer):
+
         if answer.ok:
+            # Serial port
             self.__serialPort.rawMode = True
-            wx.CallAfter(pub.sendMessage, "AppendLogText", text='\nRemote connection open')
-            logger.info('Remote connection open')
+
+            try:
+                localPort = int(self.localport_text.GetValue())
+                downPort = int(self.local_down_port_text.GetValue())
+                type = self.conntype_combo.GetValue()
+
+                # Check correct values
+                if self.__localSocket.start(localPort, downPort, type):
+                    # Serial and local socket are both connected
+                    # now just enable redirection
+                    txt ='\nWaiting for local socket connection'
+                    logger.info('Waiting for local socket connection')
+                else:
+                    txt ='\nError opening local ports'
+                    logger.error('Error opening local ports')
+
+                txt += '\nRemote connection open'
+                logger.info('Remote connection open')
+
+            except Exception, v:
+                txt ='\nWrong port number'
+                logger.error('Wrong port number(s) ' + v.strerror)
+
+        else:
+            txt = '\nError opening remote connection'
+
+        wx.CallAfter(pub.sendMessage, "AppendLogText", text=txt)
 
     def _answerIPRHandler(self, answer):
         if answer.ok:

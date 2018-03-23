@@ -26,13 +26,14 @@ class LocalSocket(object):
         self.__socketType = ''
         self.__listenSocket = None
         self.__connSocket = None
+        self.__udpDownSocket = None
         self.__socketThread = None
         self.__remoteAddress = ('', 5001)
 
-    def start(self, port, socketType):
+    def start(self, port, downPort, socketType):
         result = True
 
-        if self.status and socketType not in ['TCP','UDP']:
+        if self.status and socketType not in ['TCP', 'UDP']:
             result = False
         else:
             try:
@@ -42,16 +43,22 @@ class LocalSocket(object):
                     # Bind the socket to the port
                     self.__remoteAddress = ("", port)  # to connect from outside the machine
                     self.__listenSocket.bind(self.__remoteAddress)
-                    logger.info('Starting request port on port ' + server_address[1])
+                    logger.info('Starting request port on port ' + str(port))
                     target = self._listen_thread
                     self.status = True
 
                 elif socketType == 'UDP':
+                    # Uplink socket (read)
                     self.__connSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                    self.__remoteAddress = ("127.0.0.1", port)
-                    self.__connSocket.bind(self.__remoteAddress)
+                    uplinkAddr = ("127.0.0.1", port)
+                    self.__connSocket.bind(uplinkAddr)
                     self.__connSocket.setblocking(0)
                     self.__connSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+                    # Downlink socket (write)
+                    self.__remoteAddress = ("127.0.0.1", downPort)
+                    self.__udpDownSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    self.__udpDownSocket.setblocking(0)
 
                     logger.info('Open socket on port ' + str(port))
                     target = self._udp_listen_thread
@@ -66,6 +73,7 @@ class LocalSocket(object):
             self.__socketType = socketType
             self.__socketThread = threading.Thread(target=target, args=())
             self.__socketThread.start()
+
         return result
 
     def stop(self):
@@ -143,8 +151,7 @@ class LocalSocket(object):
         while self.status and not rx_error:
             try:
                 ready_to_read, ready_to_write, in_error = select.select(
-                    [self.__connSocket],
-                    [self.__connSocket], [])
+                    [self.__connSocket], [], [])
 
                 if ready_to_read:
                     data, addr = self.__connSocket.recvfrom(RX_BUFFER_SIZE)
@@ -160,10 +167,6 @@ class LocalSocket(object):
                     rx_error = True
 
             except socket.error, v:
-                #if v.args[0] == errno.EWOULDBLOCK:
-                    # connection closed
-                    #continue
-                #else:
                 rx_error = True
                 logger.error('Exception receiving data new connection, ' + v.strerror)
 
@@ -178,6 +181,6 @@ class LocalSocket(object):
                 if self.__socketType == 'TCP':
                     self.__connSocket.sendall(tx_data)
                 else:
-                    self.__connSocket.sendto(tx_data, self.__remoteAddress)
-            except socket.error:
-                logger.error("Error sending mesage")
+                    self.__udpDownSocket.sendto(tx_data, self.__remoteAddress)
+            except socket.error, v:
+                logger.error("Error sending mesage " + v.strerror)

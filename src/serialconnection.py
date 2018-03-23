@@ -189,7 +189,7 @@ class SerialConnection(object):
                 self.__cmdProcesssedEvent.clear()
                 logger.debug("[W]event rx")
 
-            except Exception as e:
+            except Exception:
                 logger.error("[W]Exception write thread ")
         logger.debug("exit wr")
 
@@ -252,8 +252,8 @@ class SerialConnection(object):
                     self.rawData(data)
                     self.__serial.write(self.__tx_decoder.encode(data))
 
-        except Exception as e:
-            logger.error("Exception writeDirect " + e.strerror)
+        except Exception, v:
+            logger.error("Exception writeDirect " + v.strerror)
 
     def writeRaw(self, data):
         if self.status:
