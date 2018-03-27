@@ -19,7 +19,7 @@ class MainFrame ( wx.Frame ):
 	def __init__( self, parent ):
 		wx.Frame.__init__ ( self, parent, id = wx.ID_ANY, title = u"ATareado", pos = wx.DefaultPosition, size = wx.Size( 661,564 ), style = wx.DEFAULT_FRAME_STYLE|wx.TAB_TRAVERSAL )
 		
-		self.SetSizeHints( wx.DefaultSize, wx.DefaultSize )
+		self.SetSizeHints(  wx.Size( 731,564 ), wx.DefaultSize )
 		#self.SetForegroundColour( wx.SystemSettings.GetColour( wx.SYS_COLOUR_WINDOW ) )
 		self.SetBackgroundColour( wx.SystemSettings.GetColour( wx.SYS_COLOUR_WINDOW ) )
 		
@@ -31,6 +31,8 @@ class MainFrame ( wx.Frame ):
 
 		bSizer6.SetMinSize( wx.Size( 300,-1 ) )
 		self.m_notebook1 = wx.Notebook( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0, u"solapas" )
+		self.m_notebook1.SetMinSize( wx.Size( 350,-1 ) )
+		
 		self.m_panel1 = wx.Panel( self.m_notebook1, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL, u"Commands" )
 		bSizer4 = wx.BoxSizer( wx.VERTICAL )
 
@@ -83,7 +85,7 @@ class MainFrame ( wx.Frame ):
 		self.m_panel1.SetSizer( bSizer4 )
 		self.m_panel1.Layout()
 		bSizer4.Fit( self.m_panel1 )
-		self.m_notebook1.AddPage( self.m_panel1, u"Serial commands", True )
+		self.m_notebook1.AddPage( self.m_panel1, u"Serial commands", False )
 		self.m_panel2 = wx.Panel( self.m_notebook1, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
 		fgSizer5 = wx.FlexGridSizer( 0, 2, 0, 0 )
 		fgSizer5.SetFlexibleDirection( wx.BOTH )
@@ -143,7 +145,41 @@ class MainFrame ( wx.Frame ):
 		self.m_panel2.SetSizer( fgSizer5 )
 		self.m_panel2.Layout()
 		fgSizer5.Fit( self.m_panel2 )
-		self.m_notebook1.AddPage( self.m_panel2, u"TCP local port", False )
+		self.m_notebook1.AddPage( self.m_panel2, u"Socket bridge", False )
+		self.m_panel4 = wx.Panel( self.m_notebook1, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
+		gSizer3 = wx.GridSizer( 0, 2, 0, 0 )
+		
+		self.m_staticText12 = wx.StaticText( self.m_panel4, wx.ID_ANY, u"Data", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.m_staticText12.Wrap( -1 )
+		gSizer3.Add( self.m_staticText12, 0, wx.ALL, 5 )
+		
+		self.serialdata_txt = wx.TextCtrl( self.m_panel4, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
+		gSizer3.Add( self.serialdata_txt, 0, wx.ALL, 5 )
+		
+		self.checkloop = wx.CheckBox( self.m_panel4, wx.ID_ANY, u"Loop", wx.DefaultPosition, wx.DefaultSize, 0 )
+		gSizer3.Add( self.checkloop, 0, wx.ALL, 5 )
+		
+		
+		gSizer3.AddSpacer( 0 )
+		
+		self.m_staticText13 = wx.StaticText( self.m_panel4, wx.ID_ANY, u"Delay", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.m_staticText13.Wrap( -1 )
+		gSizer3.Add( self.m_staticText13, 0, wx.ALL, 5 )
+		
+		self.serialdelay_txt = wx.TextCtrl( self.m_panel4, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
+		gSizer3.Add( self.serialdelay_txt, 0, wx.ALL, 5 )
+		
+		self.serialstart_btn = wx.Button( self.m_panel4, wx.ID_ANY, u"Start", wx.DefaultPosition, wx.DefaultSize, 0 )
+		gSizer3.Add( self.serialstart_btn, 0, wx.ALL, 5 )
+		
+		self.serialstop_btn = wx.Button( self.m_panel4, wx.ID_ANY, u"Stop", wx.DefaultPosition, wx.DefaultSize, 0 )
+		gSizer3.Add( self.serialstop_btn, 0, wx.ALL, 5 )
+		
+		
+		self.m_panel4.SetSizer( gSizer3 )
+		self.m_panel4.Layout()
+		gSizer3.Fit( self.m_panel4 )
+		self.m_notebook1.AddPage( self.m_panel4, u"Serial tx", True )
 		
 		bSizer6.Add( self.m_notebook1, 1, wx.EXPAND |wx.ALL, 5 )
 		
@@ -228,6 +264,8 @@ class MainFrame ( wx.Frame ):
 		self.send_direct_button.Bind( wx.EVT_BUTTON, self.send_direct_buttonOnButtonClick )
 		self.connect_remote_button.Bind( wx.EVT_BUTTON, self.connect_remote_buttonOnButtonClick )
 		self.close_remote_conn_button.Bind( wx.EVT_BUTTON, self.close_remote_conn_buttonOnButtonClick )
+		self.serialstart_btn.Bind( wx.EVT_BUTTON, self.serialstart_btnOnButtonClick )
+		self.serialstop_btn.Bind( wx.EVT_BUTTON, self.serialstop_btnOnButtonClick )
 		self.clear_button.Bind( wx.EVT_BUTTON, self.clear_buttonOnButtonClick )
 		self.conn_button.Bind( wx.EVT_BUTTON, self.conn_button_onclick )
 
@@ -258,6 +296,12 @@ class MainFrame ( wx.Frame ):
 		event.Skip()
 	
 	def close_remote_conn_buttonOnButtonClick( self, event ):
+		event.Skip()
+	
+	def serialstart_btnOnButtonClick( self, event ):
+		event.Skip()
+	
+	def serialstop_btnOnButtonClick( self, event ):
 		event.Skip()
 	
 	def clear_buttonOnButtonClick( self, event ):

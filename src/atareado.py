@@ -14,6 +14,7 @@ import scriptsreader
 import Log
 import time
 from Log import logger
+from serialwriter import SerialWriter
 
 
 SCRIPTS_PATH = './scripts/'
@@ -35,8 +36,10 @@ class ATareado(form.MainFrame):
         self.__localSocket.dataReadCallback = self.localSocketDataRead
         self.__localSocket.connClosedCallback = self.localSocketConnectionClosed
 
+        self.__serialWriter = SerialWriter()
+        self.__serialWriter.sendData = self.serialWritersendDataCallback
+
         self.__socketRedirection = False
-        self.__bridgeOn = False
 
         self.__answerHandler = {atcmds.CIPSTART_CMD_ID:  self._answerCIPSTARTHandler,
                                 atcmds.IPR_CMD_ID:       self._answerIPRHandler}
@@ -161,19 +164,30 @@ class ATareado(form.MainFrame):
 
     def connect_remote_buttonOnButtonClick(self, event):
         if self.__serialPort.status:
-            if not self.__bridgeOn:
+            if not self.__serialPort.rawMode:
                 params = [self.conntype_combo.GetValue(),
                           self.remoteaddress_text.GetValue(),
                           self.remoteport_text.GetValue()]
                 cmd = ATcommand(atcmds.CIPSTART_CMD_ID, True, params)
                 self.__serialPort.sendCommand(cmd)
             else:
-                pass
-        #if not self.__localSocket.status:
-        # Get addr
+                logger.info("Connection already open")
 
-    def _mount_bridge(self, type, remoteAddr, remotePort):
-        pass
+    def serialstart_btnOnButtonClick(self, event):
+        loop = self.checkloop.GetValue()
+        data = self.serialdata_txt.GetValue() + '\r\n'
+        delay_txt = self.serialdelay_txt.GetValue()
+        if delay_txt == '':
+            delay = 1
+        else:
+            try:
+                delay = int(delay_txt)
+            except:
+                delay = 1
+        self.__serialWriter.start(loop, delay, data)
+
+    def serialstop_btnOnButtonClick(self, event):
+        self.__serialWriter.stop()
 
     ''' =============================
             Callbacks handlers
@@ -314,6 +328,9 @@ class ATareado(form.MainFrame):
 
     def SetStatusText(self, text):
         self.m_staticText1.SetLabel(text)
+
+    def serialWritersendDataCallback(self, data):
+        self.__serialPort.writeRaw(data)
 
 
 if __name__ == "__main__":

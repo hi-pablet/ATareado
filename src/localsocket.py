@@ -4,7 +4,6 @@ import errno
 import threading
 from time import sleep
 from Log import logger
-import Log
 from pprint import pprint
 
 
@@ -160,6 +159,7 @@ class LocalSocket(object):
                     if data:
                         rx_bytes = bytearray(data)
                         self.dataReadCallback(rx_bytes)
+                        #sleep(0.001)
                 elif ready_to_write:
                     continue
                 else:
@@ -170,6 +170,7 @@ class LocalSocket(object):
                 rx_error = True
                 logger.error('Exception receiving data new connection, ' + v.strerror)
 
+        print "exit udp read"
         return rx_error
 
 

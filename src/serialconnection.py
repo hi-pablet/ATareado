@@ -50,8 +50,8 @@ class SerialConnection(object):
         # 5 seconds timeout
         self.__TOTimer = None
         self.__cmdMutex = threading.Lock()
-        self.input_encoding = 'UTF-8'
-        self.output_encoding = 'UTF-8'
+        #self.input_encoding = 'UTF-8'
+        #self.output_encoding = 'UTF-8'
         self.__rx_decoder = codecs.getincrementaldecoder('UTF-8')('replace')
         self.__tx_decoder = codecs.getincrementalencoder('UTF-8')('replace')
 
@@ -253,7 +253,7 @@ class SerialConnection(object):
                     self.__serial.write(self.__tx_decoder.encode(data))
 
         except Exception, v:
-            logger.error("Exception writeDirect " + v.strerror)
+            logger.error("Exception writeDirect")
 
     def writeRaw(self, data):
         if self.status:
