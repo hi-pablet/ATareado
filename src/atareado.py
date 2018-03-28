@@ -164,14 +164,35 @@ class ATareado(form.MainFrame):
 
     def connect_remote_buttonOnButtonClick(self, event):
         if self.__serialPort.status:
-            if not self.__serialPort.rawMode:
-                params = [self.conntype_combo.GetValue(),
-                          self.remoteaddress_text.GetValue(),
-                          self.remoteport_text.GetValue()]
-                cmd = ATcommand(atcmds.CIPSTART_CMD_ID, True, params)
-                self.__serialPort.sendCommand(cmd)
-            else:
-                logger.info("Connection already open")
+            # Serial port
+            self.__serialPort.rawMode = True
+
+            try:
+                localPort = int(self.localport_text.GetValue())
+                downPort = int(self.local_down_port_text.GetValue())
+                type = self.conntype_combo.GetValue()
+
+                # Check correct values
+                if self.__localSocket.start(localPort, downPort, type):
+                    # Serial and local socket are both connected
+                    # now just enable redirection
+                    txt = '\nWaiting for local socket connection'
+                    logger.info('Waiting for local socket connection')
+                else:
+                    txt = '\nError opening local ports'
+                    logger.error('Error opening local ports')
+
+                txt += '\nRemote connection open'
+                logger.info('Remote connection open')
+
+            except Exception, v:
+                txt = '\nWrong port number'
+                logger.error('Wrong port number(s) ' + v.strerror)
+
+        else:
+            txt = '\nError opening remote connection'
+
+        wx.CallAfter(pub.sendMessage, "AppendLogText", text=txt)
 
     def serialstart_btnOnButtonClick(self, event):
         loop = self.checkloop.GetValue()
