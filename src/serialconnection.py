@@ -235,7 +235,7 @@ class SerialConnection(object):
                             self.receivedData(text)
                             logger.debug('<'+text+'>')
                     else:
-                        logger.debug('{' + text + '}')
+                        logger.debug('{' + readBytes + '}')
                         self.receivedData(readBytes)
                         
         except serial.SerialException:
