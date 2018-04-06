@@ -147,39 +147,35 @@ class MainFrame ( wx.Frame ):
 		fgSizer5.Fit( self.m_panel2 )
 		self.m_notebook1.AddPage( self.m_panel2, u"Socket bridge", False )
 		self.m_panel4 = wx.Panel( self.m_notebook1, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.TAB_TRAVERSAL )
-		gSizer3 = wx.GridSizer( 0, 2, 0, 0 )
+		fgSizer41 = wx.FlexGridSizer( 0, 2, 0, 0 )
+		fgSizer41.SetFlexibleDirection( wx.BOTH )
+		fgSizer41.SetNonFlexibleGrowMode( wx.FLEX_GROWMODE_SPECIFIED )
 		
-		self.m_staticText12 = wx.StaticText( self.m_panel4, wx.ID_ANY, u"Data", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.m_staticText12 = wx.StaticText( self.m_panel4, wx.ID_ANY, u"Throughput", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText12.Wrap( -1 )
-		gSizer3.Add( self.m_staticText12, 0, wx.ALL, 5 )
+		fgSizer41.Add( self.m_staticText12, 0, wx.ALL, 5 )
 		
 		self.serialdata_txt = wx.TextCtrl( self.m_panel4, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
-		gSizer3.Add( self.serialdata_txt, 0, wx.ALL, 5 )
+		fgSizer41.Add( self.serialdata_txt, 0, wx.ALL, 5 )
 		
-		self.checkloop = wx.CheckBox( self.m_panel4, wx.ID_ANY, u"Loop", wx.DefaultPosition, wx.DefaultSize, 0 )
-		gSizer3.Add( self.checkloop, 0, wx.ALL, 5 )
-		
-		
-		gSizer3.AddSpacer( 0 )
-		
-		self.m_staticText13 = wx.StaticText( self.m_panel4, wx.ID_ANY, u"Delay", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.m_staticText13 = wx.StaticText( self.m_panel4, wx.ID_ANY, u"Duration", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText13.Wrap( -1 )
-		gSizer3.Add( self.m_staticText13, 0, wx.ALL, 5 )
+		fgSizer41.Add( self.m_staticText13, 0, wx.ALL, 5 )
 		
 		self.serialdelay_txt = wx.TextCtrl( self.m_panel4, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
-		gSizer3.Add( self.serialdelay_txt, 0, wx.ALL, 5 )
+		fgSizer41.Add( self.serialdelay_txt, 0, wx.ALL, 5 )
 		
 		self.serialstart_btn = wx.Button( self.m_panel4, wx.ID_ANY, u"Start", wx.DefaultPosition, wx.DefaultSize, 0 )
-		gSizer3.Add( self.serialstart_btn, 0, wx.ALL, 5 )
+		fgSizer41.Add( self.serialstart_btn, 0, wx.ALL, 5 )
 		
 		self.serialstop_btn = wx.Button( self.m_panel4, wx.ID_ANY, u"Stop", wx.DefaultPosition, wx.DefaultSize, 0 )
-		gSizer3.Add( self.serialstop_btn, 0, wx.ALL, 5 )
+		fgSizer41.Add( self.serialstop_btn, 0, wx.ALL, 5 )
 		
 		
-		self.m_panel4.SetSizer( gSizer3 )
+		self.m_panel4.SetSizer( fgSizer41 )
 		self.m_panel4.Layout()
-		gSizer3.Fit( self.m_panel4 )
-		self.m_notebook1.AddPage( self.m_panel4, u"Serial tx", True )
+		fgSizer41.Fit( self.m_panel4 )
+		self.m_notebook1.AddPage( self.m_panel4, u"Serial tx", False )
 		
 		bSizer6.Add( self.m_notebook1, 1, wx.EXPAND |wx.ALL, 5 )
 		

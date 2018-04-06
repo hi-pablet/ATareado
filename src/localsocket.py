@@ -7,7 +7,7 @@ from Log import logger
 from pprint import pprint
 
 
-RX_BUFFER_SIZE = 128
+RX_BUFFER_SIZE = 4096
 
 class LocalSocket(object):
 # This class receives connection requests from the drivers and handles the

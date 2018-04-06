@@ -174,17 +174,23 @@ class ATareado(form.MainFrame):
                 logger.info("Connection already open")
 
     def serialstart_btnOnButtonClick(self, event):
-        loop = self.checkloop.GetValue()
-        data = self.serialdata_txt.GetValue() + '\r\n'
-        delay_txt = self.serialdelay_txt.GetValue()
-        if delay_txt == '':
-            delay = 1
+        throughput_txt = self.serialdata_txt.GetValue()
+        duration_txt = self.serialdelay_txt.GetValue()
+        if duration_txt == '':
+            duration = 10
         else:
             try:
-                delay = int(delay_txt)
+                duration = float(duration_txt)
             except:
-                delay = 1
-        self.__serialWriter.start(loop, delay, data)
+                duration = 1
+        if throughput_txt == '':
+            throughput = 10
+        else:
+            try:
+                throughput = int(throughput_txt)
+            except:
+                throughput = 1
+        self.__serialWriter.start(throughput, duration)
 
     def serialstop_btnOnButtonClick(self, event):
         self.__serialWriter.stop()
